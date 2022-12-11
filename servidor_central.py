@@ -5,14 +5,13 @@ import json
 import encoder_decoder
 from typing import TextIO
 
-
 class Server():
     server: socket.socket
     ip: str
     port: int
     max_connections: int
-    inputs: 'list[socket.socket | TextIO]'
-    workers: 'list[socket.socket]'
+    inputs: "list[socket.socket | TextIO]"
+    workers: "list[socket.socket]"
 
     def __init__(self, ip, port):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -37,14 +36,14 @@ class Server():
         return
 
     def show_menu(self):
-        print('Digite uma das opcoes:', *encoder_decoder.ask_main_menu(), '', sep='\n')
-        # print(('Qual a informacao desejada:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n'))
+        print("Digite uma das opcoes:", *encoder_decoder.ask_main_menu(), "", sep="\n")
+        # print(("Qual a informacao desejada:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n"))
 
     def menu(self):
         try:
             opt = int(input())
         except ValueError:
-            print('Por favor, digite um valor inteiro')
+            print("Por favor, digite um valor inteiro")
             return
 
         if len(self.workers) == 0:
@@ -54,8 +53,8 @@ class Server():
         # possible_options = [i + 1 for i in range(len(self.workers))]
         possible_options = [i for i in range(len(encoder_decoder.ask_main_menu()))]
         if not(opt in possible_options):
-            #print('Opcao invalida, digite novamente:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n')
-            print('Opcao invalida, digite novamente:', *encoder_decoder.ask_main_menu(), '', sep='\n')
+            #print("Opcao invalida, digite novamente:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n")
+            print("Opcao invalida, digite novamente:", *encoder_decoder.ask_main_menu(), "", sep="\n")
             return
 
         self._handle_main_menu_opt(opt)
@@ -72,29 +71,29 @@ class Server():
             pass
 
         # json_message = {
-        #     'type': 'teste',
-        #     'message': 'Enviando mensagem para worker correto'
+        #     "type": "teste",
+        #     "message": "Enviando mensagem para worker correto"
         # }
         # data = json.dumps(json_message)
-        # self.workers[opt - 1].sendall(bytes(data, encoding='utf-8'))
+        # self.workers[opt - 1].sendall(bytes(data, encoding="utf-8"))
     def _define_worker(self):
-        print('Qual o servidor:\n[0] - Voltar')
-        [print(f'[{i + 1}] - Servidor {i + 1}') for i in range(len(self.workers))]
+        print("Qual o servidor:\n[0] - Voltar")
+        [print(f"[{i + 1}] - Servidor {i + 1}") for i in range(len(self.workers))]
         try:
             worker = int(input())
         except ValueError:
-            print('Por favor, digite um valor inteiro')
+            print("Por favor, digite um valor inteiro")
             return
         
         possible_workers = [0, *[i + 1 for i in range(len(self.workers))]]
 
         while not(worker in possible_workers):
-            print('Opcao invalida, digite novamente, servidores disponiveis:\n[0] - Voltar')
-            [print(f'[{i + 1}] - Servidor {i + 1}') for i in range(len(self.workers))]
+            print("Opcao invalida, digite novamente, servidores disponiveis:\n[0] - Voltar")
+            [print(f"[{i + 1}] - Servidor {i + 1}") for i in range(len(self.workers))]
             try:
                 worker = int(input())
             except ValueError:
-                print('Por favor, digite um valor inteiro')
+                print("Por favor, digite um valor inteiro")
                 worker = -1
 
         if(worker == 0):
@@ -103,13 +102,13 @@ class Server():
             return
             
         json_message = {
-            'type': 'teste',
-            'message': f'Enviando mensagem para worker correto {worker - 1}'
+            "type": "teste",
+            "message": f"Enviando mensagem para worker correto {worker - 1}"
         }
 
         data = json.dumps(json_message)
-        self.workers[worker - 1].sendall(bytes(data, encoding='utf-8'))
-        print('mensagem enviada com sucesso.\n\n')
+        self.workers[worker - 1].sendall(bytes(data, encoding="utf-8"))
+        print("mensagem enviada com sucesso.\n\n")
         waiting_response = True
         self.show_menu()
 
@@ -138,11 +137,14 @@ class Server():
         if inputs is self.server:
             self._manage_connection(inputs)
         elif isinstance(inputs, socket.socket):
-            data = inputs.recv(1024).decode('utf-8')
-            json_data = json.loads(data)
-            print(json_data)
-        else:
-            
+            if inputs.recv(1024).decode("utf-8") == "":
+                self._close_connection(inputs)
+                return
+            print(inputs.recv(1024).decode("utf-8") == "")
+            # data = inputs.recv(1024).decode("utf-8")
+            # json_data = json.loads(data)
+            # print(json_data)
+        else:     
             self.menu()
 
     def _handle_exceptions(self, exceptions: socket.socket):
@@ -162,11 +164,11 @@ class Server():
             self.show_menu()
 
         json_message = {
-            'type': 'welcome',
-            'message': len(self.inputs) - 1
+            "type": "welcome",
+            "message": len(self.inputs) - 1
         }
         data = json.dumps(json_message)
-        connection.sendall(bytes(data, encoding='utf-8'))
+        connection.sendall(bytes(data, encoding="utf-8"))
 
     def _close_connection(self, conn):
         print(conn, "Desconectado")

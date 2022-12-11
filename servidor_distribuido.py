@@ -15,7 +15,7 @@ class Worker():
     server: socket.socket
     ip: str
     port: int
-    inputs: 'list[socket.socket | TextIO]'
+    inputs: "list[socket.socket | TextIO]"
     running: bool
 
     def __init__(self, config):
@@ -25,18 +25,18 @@ class Worker():
             self.config_data = json.load(config_file)
             config_file.close()
         except:
-            print('Arquivo invalido, tenha certeza de passar um arquivo json seguindo o exemplo!')
+            print("Arquivo invalido, tenha certeza de passar um arquivo json seguindo o exemplo!")
             sys.exit()
 
         # server tcp/ip configs
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            self.server.connect((self.config_data['ip_servidor_central'], self.config_data['porta_servidor_central']))
+            self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
         except:
-            print('Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao')
+            print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
             sys.exit()
 
-        self.inputs = [sys.stdin, self.server]
+        self.input = [self.server]
         self.running = False
 
         # initialize gpio, ports and related states
@@ -44,45 +44,29 @@ class Worker():
 
     def initial_state(self):
         # GPIO.setmode(GPIO.BCM)
-        self.light_1 = utils.get_obj_by_id(self.config_data['outputs'], 'L_01')['gpio'],
-        self.light_2 = utils.get_obj_by_id(self.config_data['outputs'], 'L_02')['gpio'],
-        self.air_conditioning = utils.get_obj_by_id(self.config_data['outputs'], 'AC')['gpio']
-        self.projector = utils.get_obj_by_id(self.config_data['outputs'], 'PR')['gpio']
-        self.alarm = utils.get_obj_by_id(self.config_data['outputs'], 'AL_BZ')['gpio']
-        self.presence_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SPres')['gpio']
-        self.smoke_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SFum')['gpio']
-        self.window_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SJan')['gpio']
-        self.door_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SPor')['gpio']
-        self.entry_people_counting_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SC_IN')['gpio']
-        self.exit_people_counting_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SC_OUT')['gpio']
-        self.temperature_sensor = self.config_data['sensor_temperatura']['gpio']
+        self.light_1 = utils.get_obj_by_id(self.config_data["outputs"], "L_01")["gpio"],
+        self.light_2 = utils.get_obj_by_id(self.config_data["outputs"], "L_02")["gpio"],
+        self.air_conditioning = utils.get_obj_by_id(self.config_data["outputs"], "AC")["gpio"]
+        self.projector = utils.get_obj_by_id(self.config_data["outputs"], "PR")["gpio"]
+        self.alarm = utils.get_obj_by_id(self.config_data["outputs"], "AL_BZ")["gpio"]
+        self.presence_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SPres")["gpio"]
+        self.smoke_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SFum")["gpio"]
+        self.window_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SJan")["gpio"]
+        self.door_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SPor")["gpio"]
+        self.entry_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SC_IN")["gpio"]
+        self.exit_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SC_OUT")["gpio"]
+        self.temperature_sensor = self.config_data["sensor_temperatura"]["gpio"]
         self.states = utils.get_initial_state()
         self.entry = 0
 
         # self.input_sensors = {
-        #     self.presence_sensor: {'name': 'SPres', 'callback_func': self._presence_sensor_callback},
-        #     self.smoke_sensor: {'name': 'SFum', 'callback_func': self._smoke_sensor_callback},
-        #     self.window_sensor: {'name': 'SJan', 'callback_func': self._window_sensor_callback},
-        #     self.door_sensor: {'name': 'SPor', 'callback_func': self._door_sensor_callback},
-        #     self.entry_people_counting_sensor: {'name': 'SC_IN', 'callback_func': self._entry_sensor_callback},
-        #     self.exit_people_counting_sensor : {'name': 'SC_OUT', 'callback_func': self._exit_sensor_callback},
+        #     self.presence_sensor: {"name": "SPres", "callback_func": self._presence_sensor_callback},
+        #     self.smoke_sensor: {"name": "SFum", "callback_func": self._smoke_sensor_callback},
+        #     self.window_sensor: {"name": "SJan", "callback_func": self._window_sensor_callback},
+        #     self.door_sensor: {"name": "SPor", "callback_func": self._door_sensor_callback},
+        #     self.entry_people_counting_sensor: {"name": "SC_IN", "callback_func": self._entry_sensor_callback},
+        #     self.exit_people_counting_sensor : {"name": "SC_OUT", "callback_func": self._exit_sensor_callback},
         # }
-
-
-    def start(self):
-        print("Conexao concluida. Digite --HELP para ajuda.\n")
-        self.running = True
-        self._run()
-
-    def close(self):
-        self._exit_server()
-
-    def _run(self):
-        while self.running:
-            inputs, _, _ = select.select(self.inputs,[],[])
-
-            for input in inputs:
-                self._handle_input(input)
 
     # def turn_on_off_projector(self):
     #     GPIO.setup(self.projector, GPIO.OUT)
@@ -96,12 +80,12 @@ class Worker():
     #     while True:
     #         humidity, temperature = Adafruit_DHT.read_retry(22, self.temperature_sensor)
     #         if humidity is not None and temperature is not None:
-    #             self.states['Temperature'] = temperature
-    #             self.states['Humidity'] = humidity
+    #             self.states["Temperature"] = temperature
+    #             self.states["Humidity"] = humidity
     #         sleep(2)
 
     # def apply_sensor_transition(self, sensor):
-    #     self.states[self.input_sensors[sensor]['name']] = 1 if self.states[self.input_sensors[sensor]['name']] == 0 else 0
+    #     self.states[self.input_sensors[sensor]["name"]] = 1 if self.states[self.input_sensors[sensor]["name"]] == 0 else 0
 
     # def restart_sensor_event_detection(self, sensor, callback_func):
     #     GPIO.remove_event_detect(sensor)
@@ -125,24 +109,24 @@ class Worker():
 
     # def _entry_sensor_callback(self, sensor):
     #     print("entrei: ", sensor)
-    #     self.states['SC_IN'] = 1
+    #     self.states["SC_IN"] = 1
     #     self.entry += 1
     #     print(self.entry)
     #     self.restart_sensor_event_detection(sensor, self._entry_sensor_callback)
 
     # def _exit_sensor_callback(self, sensor):
-    #     self.states[self.input_sensors[sensor]['name']] += 1
+    #     self.states[self.input_sensors[sensor]["name"]] += 1
     #     self.restart_sensor_event_detection(sensor, self._exit_sensor_callback)
 
     # def input_proc(self):
     #     for sensor in self.input_sensors:
     #         GPIO.setup(sensor, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    #         GPIO.add_event_detect(sensor, GPIO.RISING, callback=self.input_sensors[sensor]['callback_func'], bouncetime=200)
+    #         GPIO.add_event_detect(sensor, GPIO.RISING, callback=self.input_sensors[sensor]["callback_func"], bouncetime=200)
 
     #     while True:
     #         sleep(3)
     #         [print(key, value) for key, value in self.states.items()]
-    #         print('------------------------------------------\n\n')
+    #         print("------------------------------------------\n\n")
 
     # def verifyEntrance(self):
     #     GPIO.setup(self.entry_people_counting_sensor, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -156,25 +140,29 @@ class Worker():
     #     while True:
     #         sleep(1)
 
-    def _handle_input(self, inputs):
-        if inputs == self.server:
-            data = inputs.recv(1024).decode('utf-8')
-            json_data = json.loads(data)
-            if(json_data['type'] == 'welcome'):
-                self.id_on_server = json_data['message']
-            print(json_data)
-        else:
-            message = input()
-            json_message = {
-                'id': self.id_on_server,
-                'message': message,
-                'time': str(datetime.now())
-            }
-            data = json.dumps(json_message)
-            self.server.send(bytes(data, encoding='utf-8'))
+    def start(self):
+        print(f"Conectado ao servidor central.\nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
+        self._run()
 
-    def _exit_server(self):
-        print("Saindo do servidor...")
-        self.inputs.remove(self.server)
+    def exit(self, message):
+        print(message)
+        self.input.remove(self.server)
         self.server.close()
-        self.running = False
+
+    def _run(self):
+        while self.input:
+            inputs, _, _ = select.select(self.input,[],[])
+
+            for input in inputs:
+                self._handle_input(input)
+
+    def _handle_input(self, input):
+        if input == self.server:
+            data = input.recv(1024).decode("utf-8")
+            if data == "":
+                self.exit("servidor central foi desligado\nSaindo...")
+                return
+            json_data = json.loads(data)
+            if(json_data["type"] == "welcome"):
+                self.id_on_server = json_data["message"]
+            print(json_data)
