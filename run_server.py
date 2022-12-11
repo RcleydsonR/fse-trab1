@@ -4,8 +4,8 @@ import threading
 from servidor_central import Server
 
 @click.command()
-@click.option('--ip', '-i', default='127.0.0.1', help='Ip address of the central server', show_default=True)
-@click.option('--port', '-p', default=7777, help='Port of the central server', show_default=True)
+@click.option('--ip', '-i', help='Ip address of the central server', required=True)
+@click.option('--port', '-p', default=10000, help='Port of the central server', show_default=True)
 def main(ip, port):
     server = Server(ip, port)
 

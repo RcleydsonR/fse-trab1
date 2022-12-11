@@ -3,11 +3,9 @@ from servidor_distribuido import Worker
 from threading import Thread
 
 @click.command()
-@click.option('--ip', '-i', default='127.0.0.1', help='Ip address of the server')
-@click.option('--port', '-p', default=7777, help='Port of the server')
-@click.option('--config', '-c', help='Dashboard configuration (Json file)')
-def main(ip, port, config):
-    worker = Worker(ip, port, config)
+@click.option('--config', '-c', help='Dashboard configuration (Json config file)', required=True)
+def main(config):
+    worker = Worker(config)
 
     try:
         worker.start()

@@ -3,3 +3,20 @@ def get_obj_by_id(object_list: list, id_to_find: str):
         (obj for obj in object_list if obj['id'] == id_to_find),
         None
     )
+
+def get_initial_state():
+    return {
+        "L_01": 0,
+        "L_02": 0,
+        "AC": 0,
+        "PR": 0,
+        "AL_BZ": 0,
+        "SPres": 0,
+        "SFum": 0,
+        "SJan": 0,
+        "SPor": 0,
+        "SC_IN": 0,
+        "SC_OUT": 0,
+        "Temperature": 0,
+        "Humidity": 0
+    }

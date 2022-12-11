@@ -18,53 +18,46 @@ class Worker():
     inputs: 'list[socket.socket | TextIO]'
     running: bool
 
-    def __init__(self, ip, port, config):
+    def __init__(self, config):
+        # read json config file
+        try:
+            config_file = open(config)
+            self.config_data = json.load(config_file)
+            config_file.close()
+        except:
+            print('Arquivo invalido, tenha certeza de passar um arquivo json seguindo o exemplo!')
+            sys.exit()
+
+        # server tcp/ip configs
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.connect((ip, port))
+        try:
+            self.server.connect((self.config_data['ip_servidor_central'], self.config_data['porta_servidor_central']))
+        except:
+            print('Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao')
+            sys.exit()
+
         self.inputs = [sys.stdin, self.server]
         self.running = False
 
-        # Config port
-        config_file = open(config)
-        config_data = json.load(config_file)
-
-        # GPIO.setmode(GPIO.BCM)
-        self.light_1 = utils.get_obj_by_id(config_data['outputs'], 'L_01')['gpio'],
-        self.light_2 = utils.get_obj_by_id(config_data['outputs'], 'L_02')['gpio'],
-        self.air_conditioning = utils.get_obj_by_id(config_data['outputs'], 'AC')['gpio']
-        self.projector = utils.get_obj_by_id(config_data['outputs'], 'PR')['gpio']
-        self.alarm = utils.get_obj_by_id(config_data['outputs'], 'AL_BZ')['gpio']
-        self.presence_sensor = utils.get_obj_by_id(config_data['inputs'], 'SPres')['gpio']
-        self.smoke_sensor = utils.get_obj_by_id(config_data['inputs'], 'SFum')['gpio']
-        self.window_sensor = utils.get_obj_by_id(config_data['inputs'], 'SJan')['gpio']
-        self.door_sensor = utils.get_obj_by_id(config_data['inputs'], 'SPor')['gpio']
-        self.entry_people_counting_sensor = utils.get_obj_by_id(config_data['inputs'], 'SC_IN')['gpio']
-        self.exit_people_counting_sensor = utils.get_obj_by_id(config_data['inputs'], 'SC_OUT')['gpio']
-        self.temperature_sensor = config_data['sensor_temperatura']['gpio']
-        self.states = {}
-        self.entry = 0
-
+        # initialize gpio, ports and related states
         self.initial_state()
 
     def initial_state(self):
-        # 0 -> LOW, CLOSED
-        # 1 -> HIGH, OPENED
-
-        self.states = {
-            "L_01": 0,
-            "L_02": 0,
-            "AC": 0,
-            "PR": 0,
-            "AL_BZ": 0,
-            "SPres": 0,
-            "SFum": 0,
-            "SJan": 0,
-            "SPor": 0,
-            "SC_IN": 0,
-            "SC_OUT": 0,
-            "Temperature": 0,
-            "Humidity": 0
-        }
+        # GPIO.setmode(GPIO.BCM)
+        self.light_1 = utils.get_obj_by_id(self.config_data['outputs'], 'L_01')['gpio'],
+        self.light_2 = utils.get_obj_by_id(self.config_data['outputs'], 'L_02')['gpio'],
+        self.air_conditioning = utils.get_obj_by_id(self.config_data['outputs'], 'AC')['gpio']
+        self.projector = utils.get_obj_by_id(self.config_data['outputs'], 'PR')['gpio']
+        self.alarm = utils.get_obj_by_id(self.config_data['outputs'], 'AL_BZ')['gpio']
+        self.presence_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SPres')['gpio']
+        self.smoke_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SFum')['gpio']
+        self.window_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SJan')['gpio']
+        self.door_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SPor')['gpio']
+        self.entry_people_counting_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SC_IN')['gpio']
+        self.exit_people_counting_sensor = utils.get_obj_by_id(self.config_data['inputs'], 'SC_OUT')['gpio']
+        self.temperature_sensor = self.config_data['sensor_temperatura']['gpio']
+        self.states = utils.get_initial_state()
+        self.entry = 0
 
         # self.input_sensors = {
         #     self.presence_sensor: {'name': 'SPres', 'callback_func': self._presence_sensor_callback},
