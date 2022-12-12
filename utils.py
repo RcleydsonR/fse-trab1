@@ -1,3 +1,4 @@
+import json
 def get_obj_by_id(object_list: list, id_to_find: str):
     return next(
         (obj for obj in object_list if obj['id'] == id_to_find),
@@ -20,3 +21,11 @@ def get_initial_state():
         "Temperature": 0,
         "Humidity": 0
     }
+
+def encode_command(**data):
+    encoded_json = {}
+    for key, value in data.items():
+        encoded_json[key] = value
+    return json.dumps(encoded_json)
+
+# print(encode_command(type="first_access", id_value="1"))

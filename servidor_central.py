@@ -2,8 +2,11 @@ import socket
 import select
 import sys
 import json
-import encoder_decoder
+import menu_options
+import utils
 from typing import TextIO
+from time import sleep
+import threading
 
 class Server():
     server: socket.socket
@@ -11,7 +14,7 @@ class Server():
     port: int
     max_connections: int
     inputs: "list[socket.socket | TextIO]"
-    workers: "list[socket.socket]"
+    workers: "list[str | socket.socket]"
 
     def __init__(self, ip, port):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -20,6 +23,8 @@ class Server():
         self.port = port
         self.inputs = [self.server, sys.stdin]
         self.workers = []
+        self.states = {}
+        self.waiting_response = False
 
     def start(self):
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -36,7 +41,7 @@ class Server():
         return
 
     def show_menu(self):
-        print("Digite uma das opcoes:", *encoder_decoder.ask_main_menu(), "", sep="\n")
+        print("Digite uma das opcoes:", *menu_options.ask_main_menu(), "", sep="\n")
         # print(("Qual a informacao desejada:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n"))
 
     def menu(self):
@@ -51,10 +56,10 @@ class Server():
             return
 
         # possible_options = [i + 1 for i in range(len(self.workers))]
-        possible_options = [i for i in range(len(encoder_decoder.ask_main_menu()))]
+        possible_options = [i for i in range(len(menu_options.ask_main_menu()))]
         if not(opt in possible_options):
             #print("Opcao invalida, digite novamente:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n")
-            print("Opcao invalida, digite novamente:", *encoder_decoder.ask_main_menu(), "", sep="\n")
+            print("Opcao invalida, digite novamente:", *menu_options.ask_main_menu(), "", sep="\n")
             return
 
         self._handle_main_menu_opt(opt)
@@ -63,7 +68,7 @@ class Server():
         if opt == 0:
             self.close()
         elif opt == 1:
-            pass
+            print(self.states)
         elif opt == 2:
             self._define_worker()
             pass
@@ -77,7 +82,7 @@ class Server():
         # data = json.dumps(json_message)
         # self.workers[opt - 1].sendall(bytes(data, encoding="utf-8"))
     def _define_worker(self):
-        print("Qual o servidor:\n[0] - Voltar")
+        print("Qual o servidor ou opcao:\n[0] - Voltar")
         [print(f"[{i + 1}] - Servidor {i + 1}") for i in range(len(self.workers))]
         try:
             worker = int(input())
@@ -88,7 +93,7 @@ class Server():
         possible_workers = [0, *[i + 1 for i in range(len(self.workers))]]
 
         while not(worker in possible_workers):
-            print("Opcao invalida, digite novamente, servidores disponiveis:\n[0] - Voltar")
+            print("Opcao invalida, digite novamente, servidores/opcoes disponiveis:\n[0] - Voltar")
             [print(f"[{i + 1}] - Servidor {i + 1}") for i in range(len(self.workers))]
             try:
                 worker = int(input())
@@ -101,16 +106,20 @@ class Server():
             self.show_menu()
             return
             
-        json_message = {
-            "type": "teste",
-            "message": f"Enviando mensagem para worker correto {worker - 1}"
-        }
+        self.workers[worker - 1].sendall(bytes(utils.encode_command(type="turn_on_all_lights"), encoding="utf-8"))
+        self.waiting_response = True
+        threading.Thread(target=self._load_animation).start()
 
-        data = json.dumps(json_message)
-        self.workers[worker - 1].sendall(bytes(data, encoding="utf-8"))
-        print("mensagem enviada com sucesso.\n\n")
-        waiting_response = True
-        self.show_menu()
+
+    def _load_animation(self):
+        while self.waiting_response:
+            steps = ['|', '/', '-', '\\']
+            for step in steps:
+                if not(self.waiting_response):
+                    break
+                print(f"\rAguardando confirmacao do comando {step}", end=" ")
+                sleep(0.25)
+        return
 
     def send_message(self, conn: socket.socket, message):
         message_encoded = self._encode_message(message)
@@ -130,22 +139,23 @@ class Server():
             for e in exceptional:
                 self._handle_exceptions(e)
 
-    def _handle_writable(self, output: socket.socket):
-        return
-
     def _handle_readable(self, inputs: socket.socket):
         if inputs is self.server:
             self._manage_connection(inputs)
         elif isinstance(inputs, socket.socket):
-            if inputs.recv(1024).decode("utf-8") == "":
+            self.waiting_response = False
+            data = inputs.recv(2048).decode("utf-8")
+            if data == "":
                 self._close_connection(inputs)
                 return
-            print(inputs.recv(1024).decode("utf-8") == "")
-            # data = inputs.recv(1024).decode("utf-8")
-            # json_data = json.loads(data)
-            # print(json_data)
-        else:     
-            self.menu()
+            else:
+                json_data = json.loads(data)
+                print("\n", json_data)
+        else:
+            if self.waiting_response:
+                input()
+            else:
+                self.menu()
 
     def _handle_exceptions(self, exceptions: socket.socket):
         self.inputs.remove(exceptions)
@@ -156,19 +166,17 @@ class Server():
     def _manage_connection(self, s):
         connection, _ = s.accept()
         connection.setblocking(0)
+        new_connection_index = str(len(self.inputs))
 
         self.inputs.append(connection)
         self.workers.append(connection)
+        self.states[new_connection_index] = utils.get_initial_state()
+        connection.sendall(bytes(utils.encode_command(type="first_access", id_value=new_connection_index), encoding="utf-8"))
+        print(new_connection_index)
 
-        if(len(self.workers) == 1): # First connection
+        if(len(self.workers) == 1): # First connection on the server
+            print("A primeira conexao com o servidor foi feita.\n")
             self.show_menu()
-
-        json_message = {
-            "type": "welcome",
-            "message": len(self.inputs) - 1
-        }
-        data = json.dumps(json_message)
-        connection.sendall(bytes(data, encoding="utf-8"))
 
     def _close_connection(self, conn):
         print(conn, "Desconectado")

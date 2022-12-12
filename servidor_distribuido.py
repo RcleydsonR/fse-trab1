@@ -6,7 +6,6 @@ from typing import TextIO
 from datetime import datetime
 import utils
 # import RPi.GPIO as GPIO
-# from pigpio_dht import DHT22
 # import Adafruit_DHT
 from time import sleep
 import threading
@@ -16,7 +15,7 @@ class Worker():
     ip: str
     port: int
     inputs: "list[socket.socket | TextIO]"
-    running: bool
+    id_on_server: str
 
     def __init__(self, config):
         # read json config file
@@ -36,8 +35,7 @@ class Worker():
             print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
             sys.exit()
 
-        self.input = [self.server]
-        self.running = False
+        self.input = [self.server, sys.stdin]
 
         # initialize gpio, ports and related states
         self.initial_state()
@@ -147,6 +145,7 @@ class Worker():
     def exit(self, message):
         print(message)
         self.input.remove(self.server)
+        self.input.remove(sys.stdin)
         self.server.close()
 
     def _run(self):
@@ -156,13 +155,34 @@ class Worker():
             for input in inputs:
                 self._handle_input(input)
 
-    def _handle_input(self, input):
-        if input == self.server:
-            data = input.recv(1024).decode("utf-8")
+    def _handle_input(self, inputs):
+        if inputs == self.server:
+            data = inputs.recv(1024).decode("utf-8")
             if data == "":
                 self.exit("servidor central foi desligado\nSaindo...")
                 return
             json_data = json.loads(data)
-            if(json_data["type"] == "welcome"):
-                self.id_on_server = json_data["message"]
-            print(json_data)
+            self._decode_server_message(json_data)
+        else:
+            message = input()
+            if message == "1":
+                self.server.send(bytes(
+                    utils.encode_command(type="states_refresh", worker_id=self.id_on_server, states=self.states, time= str(datetime.now())), encoding='utf-8')
+                )
+
+    def _decode_server_message(self, json_msg):
+        if (json_msg["type"] == "first_access"):
+            self.id_on_server = json_msg["id_value"]
+        elif (json_msg["type"] == "id_change"):
+            self.id_on_server = json_msg["id_value"]
+        elif (json_msg["type"] == "trigger"):
+            # self.trigger...
+            self.states[json_msg["output"]] = json_msg["value"]
+        elif (json_msg["type"] == "turn_on_all_lights"):
+            # self.turn_on_all_lights...
+            print("turn on lights")
+        elif (json_msg["type"] == "turn_off_all"):
+            # self.turn_off_all...
+            print("turn off all")
+        else:
+            print("mensagem desconhecida")
