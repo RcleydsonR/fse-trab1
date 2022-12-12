@@ -61,11 +61,10 @@
             "gpio": 27
         }
     ],
-    "sensor_temperatura":[
-        {
-          "id": "DHT_22",
-          "tag": "Sensor de Temperatura e Umidade",
-          "gpio": 18
-        }
-    ]
+    "sensor_temperatura":
+    {
+        "id": "DHT_22",
+        "tag": "Sensor de Temperatura e Umidade",
+        "gpio": 18
+    }
 }

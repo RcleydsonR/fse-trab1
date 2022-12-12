@@ -41,72 +41,85 @@ class Server():
         return
 
     def show_menu(self):
-        print("Digite uma das opcoes:", *menu_options.ask_main_menu(), "", sep="\n")
-        # print(("Qual a informacao desejada:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n"))
+        print("", "------------------------------------------------", "Bem vindo ao menu principal, o que deseja fazer:", *menu_options.ask_main_menu(), "", sep="\n")
 
     def menu(self):
-        try:
-            opt = int(input())
-        except ValueError:
-            print("Por favor, digite um valor inteiro")
-            return
-
         if len(self.workers) == 0:
-            print("Aguardando algum servidor distribuido se conectar\n\n")
+            input()
+            print("Aguardando algum servidor distribuido se conectar\n")
             return
 
-        # possible_options = [i + 1 for i in range(len(self.workers))]
         possible_options = [i for i in range(len(menu_options.ask_main_menu()))]
-        if not(opt in possible_options):
-            #print("Opcao invalida, digite novamente:\n1. Estado das entradas\n2. Estado das saídas\n3. Valor da temperatura e umidade\n4. Contador de ocupações\n")
-            print("Opcao invalida, digite novamente:", *menu_options.ask_main_menu(), "", sep="\n")
-            return
+        option = utils.get_valid_option(possible_options, menu_options.ask_main_menu())
 
-        self._handle_main_menu_opt(opt)
+        self._handle_main_menu_opt(option)
 
-    def _handle_main_menu_opt(self, opt):
-        if opt == 0:
+    def _handle_main_menu_opt(self, option):
+        if option == 0:
             self.close()
-        elif opt == 1:
+        elif option == 1:
             print(self.states)
-        elif opt == 2:
+        elif option == 2:
             self._define_worker()
             pass
         else:
             pass
 
-        # json_message = {
-        #     "type": "teste",
-        #     "message": "Enviando mensagem para worker correto"
-        # }
-        # data = json.dumps(json_message)
-        # self.workers[opt - 1].sendall(bytes(data, encoding="utf-8"))
     def _define_worker(self):
-        print("Qual o servidor ou opcao:\n[0] - Voltar")
-        [print(f"[{i + 1}] - Servidor {i + 1}") for i in range(len(self.workers))]
-        try:
-            worker = int(input())
-        except ValueError:
-            print("Por favor, digite um valor inteiro")
-            return
-        
-        possible_workers = [0, *[i + 1 for i in range(len(self.workers))]]
+        workers_size = len(self.workers)
+        print("Qual o servidor ou opcao:", *menu_options.ask_worker(workers_size), "", sep="\n")
+        possible_options = [0, *[i + 1 for i in range(workers_size + 2)]]
 
-        while not(worker in possible_workers):
-            print("Opcao invalida, digite novamente, servidores/opcoes disponiveis:\n[0] - Voltar")
-            [print(f"[{i + 1}] - Servidor {i + 1}") for i in range(len(self.workers))]
-            try:
-                worker = int(input())
-            except ValueError:
-                print("Por favor, digite um valor inteiro")
-                worker = -1
+        option = utils.get_valid_option(possible_options, menu_options.ask_worker(workers_size))
 
-        if(worker == 0):
+        if(option == 0):
             print()
             self.show_menu()
             return
-            
-        self.workers[worker - 1].sendall(bytes(utils.encode_command(type="turn_on_all_lights"), encoding="utf-8"))
+        
+        if option <= workers_size:
+            self._define_trigger(option - 1)
+        elif option == workers_size + 1:
+            self._send_all_workers_command(utils.encode_command(type="turn_on_all_lights"))
+        else:
+            self._send_all_workers_command(utils.encode_command(type="turn_off_all"))
+
+    def _define_trigger(self, worker):
+        ask_command = menu_options.ask_command(self.states[str(worker + 2)])
+        print("O que deseja fazer:", *ask_command, "", sep="\n")
+        possible_options = [*[i for i in range(len(ask_command))]]
+        option = utils.get_valid_option(possible_options, ask_command)
+
+        self._handle_triggered_action(worker, option)
+        return
+    
+    def _handle_triggered_action(self, worker, option):
+        if option == 0:
+            return
+        elif option == 1:
+            value_to_trigger = 0 if self.states[str(worker + 2)]["L_01"] == 1 else 1
+            self.workers[worker].sendall(bytes(utils.encode_command(type="trigger", output="L_01", value=value_to_trigger), encoding="utf-8"))
+        elif option == 2:
+            value_to_trigger = 0 if self.states[str(worker + 2)]["L_02"] == 1 else 1
+            self.workers[worker].sendall(bytes(utils.encode_command(type="trigger", output="L_02", value=value_to_trigger), encoding="utf-8"))
+        elif option == 3:
+            value_to_trigger = 0 if self.states[str(worker + 2)]["AC"] == 1 else 1
+            self.workers[worker].sendall(bytes(utils.encode_command(type="trigger", output="AC", value=value_to_trigger), encoding="utf-8"))
+        elif option == 4:
+            value_to_trigger = 0 if self.states[str(worker + 2)]["PR"] == 1 else 1
+            self.workers[worker].sendall(bytes(utils.encode_command(type="trigger", output="PR", value=value_to_trigger), encoding="utf-8"))
+        elif option == 5:
+            value_to_trigger = 0 if self.states[str(worker + 2)]["AL_BZ"] == 1 else 1
+            self.workers[worker].sendall(bytes(utils.encode_command(type="trigger", output="AL_BZ", value=value_to_trigger), encoding="utf-8"))
+        elif option == 6:
+            value_to_trigger = 0 if self.states[str(worker + 2)]["SFum"] == 1 else 1
+            self.workers[worker].sendall(bytes(utils.encode_command(type="trigger", output="SFum", value=value_to_trigger), encoding="utf-8"))
+        elif option == 7:
+            self.workers[worker].sendall(bytes(utils.encode_command(type="turn_on_all_lights"), encoding="utf-8"))
+        elif option == 8:
+            self.workers[worker].sendall(bytes(utils.encode_command(type="turn_off_all_lights"), encoding="utf-8"))
+        elif option == 9:
+            self.workers[worker].sendall(bytes(utils.encode_command(type="turn_off_all"), encoding="utf-8"))
         self.waiting_response = True
         threading.Thread(target=self._load_animation).start()
 
@@ -119,11 +132,14 @@ class Server():
                     break
                 print(f"\rAguardando confirmacao do comando {step}", end=" ")
                 sleep(0.25)
+        self.show_menu()
         return
 
-    def send_message(self, conn: socket.socket, message):
-        message_encoded = self._encode_message(message)
-        conn.sendall(message_encoded)
+    def _send_all_workers_command(self, encoded_command):
+        for worker in self.workers:
+            worker.sendall(bytes(encoded_command, encoding="utf-8"))
+            self.waiting_response = True
+            threading.Thread(target=self._load_animation).start()
 
     def _run(self):
         print("Aguardando em ", (self.ip, self.port))
@@ -159,8 +175,8 @@ class Server():
 
     def _handle_exceptions(self, exceptions: socket.socket):
         self.inputs.remove(exceptions)
-        if exceptions in self.outputs:
-            self.outputs.remove(exceptions)
+        if exceptions in self.workers:
+            self.workers.remove(exceptions)
         exceptions.close()
 
     def _manage_connection(self, s):
