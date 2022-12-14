@@ -1,4 +1,5 @@
 import json
+
 def get_obj_by_id(object_list: list, id_to_find: str):
     return next(
         (obj for obj in object_list if obj['id'] == id_to_find),
@@ -22,11 +23,11 @@ def get_initial_state():
         "Humidity": 0
     }
 
-def encode_command(**data):
+def encode_message(**data):
     encoded_json = {}
     for key, value in data.items():
         encoded_json[key] = value
-    return json.dumps(encoded_json)
+    return bytes(json.dumps(encoded_json), encoding='utf-8')
 
 def get_valid_option(possible_option, show_possible_option):
     option = -1
@@ -39,4 +40,4 @@ def get_valid_option(possible_option, show_possible_option):
             break
         print("Opcao invalida, digite novamente, opcoes disponiveis:", *show_possible_option, "", sep="\n")
     return option
-# print(encode_command(type="first_access", id_value="1"))
+# print(encode_message(type="first_access", id_value="1"))

@@ -17,12 +17,12 @@ def ask_monitoring():
         "[6] - Numero de pessoas no predio"
     ]
 
-def ask_worker(workers_size):
+def ask_worker(workers):
     return [
         "[0] - Voltar",
-        *[f"[{i + 1}] - Servidor {i + 1}" for i in range(workers_size)],
-        f"[{workers_size + 1}] - Ligar todas as lampadas do predio",
-        f"[{workers_size + 2}] - Desligar todas as cargas do predio (Lampadas, projetores e aparelhos de Ar-Condicionado)",
+        *[f"[{index + 1}] - {worker.name}" for index, worker in enumerate(workers)],
+        f"[{len(workers) + 1}] - Ligar todas as lampadas do predio",
+        f"[{len(workers) + 2}] - Desligar todas as cargas do predio (Lampadas, projetores e aparelhos de Ar-Condicionado)",
     ]
 
 def ask_command(states):

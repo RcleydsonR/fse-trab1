@@ -29,8 +29,10 @@ class Worker():
 
         # server tcp/ip configs
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.id_on_server = f"{self.config_data['ip_servidor_distribuido']}:{self.config_data['nome']}"
         try:
             self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
+            self.server.send(utils.encode_message(type="worker_identify", id=self.id_on_server))
         except:
             print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
             sys.exit()
@@ -166,23 +168,21 @@ class Worker():
         else:
             message = input()
             if message == "1":
-                self.server.send(bytes(
-                    utils.encode_command(type="states_refresh", worker_id=self.id_on_server, states=self.states, time= str(datetime.now())), encoding='utf-8')
-                )
+                self.server.send(utils.encode_message(type="states_refresh", worker_id=self.id_on_server, states=self.states, time= str(datetime.now())))
+                
 
     def _decode_server_message(self, json_msg):
-        if (json_msg["type"] == "first_access"):
-            self.id_on_server = json_msg["id_value"]
-        elif (json_msg["type"] == "id_change"):
-            self.id_on_server = json_msg["id_value"]
-        elif (json_msg["type"] == "trigger"):
+        if (json_msg["type"] == "trigger"):
+            print("triggered")
             # self.trigger...
-            self.states[json_msg["output"]] = json_msg["value"]
+            state_id = json_msg["state_id"]
+            self.states[state_id] = json_msg["value"]
+            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=[state_id], values = [json_msg["value"]]))
         elif (json_msg["type"] == "turn_on_all_lights"):
-            # self.turn_on_all_lights...
-            print("turn on lights")
+            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=["L_01", "L_02"], values = [1, 1]))
+        elif (json_msg["type"] == "turn_off_all_lights"):
+            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=["L_01", "L_02"], values = [0, 0]))
         elif (json_msg["type"] == "turn_off_all"):
-            # self.turn_off_all...
-            print("turn off all")
+            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=["L_01", "L_02", "AC", "PR", "AL_BZ"], values = [0, 0, 0, 0, 0]))
         else:
             print("mensagem desconhecida")
