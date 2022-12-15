@@ -1,11 +1,23 @@
 import json
 from enum import Enum
 
-def get_obj_by_id(object_list: list, id_to_find: str):
+def get_obj_by_element(object_list: list, element_key: str, element_to_find):
     return next(
-        (obj for obj in object_list if obj['id'] == id_to_find),
+        (obj for obj in object_list if obj[element_key] == element_to_find),
         None
     )
+
+def find_worker_by_conn(workers: list, conn):
+    for worker in workers:
+        if worker.conn == conn:
+            return worker
+    return None
+
+def find_worker_by_id(workers: list, id):
+    for worker in workers:
+        if worker.id == id:
+            return worker
+    return None
 
 class Sensor(Enum):
     L_01 = "L_01"
@@ -84,4 +96,3 @@ def get_valid_option(possible_option, show_possible_option):
             break
         print("Opcao invalida, digite novamente, opcoes disponiveis:", *show_possible_option, "", sep="\n")
     return option
-# print(encode_message(type="first_access", id_value="1"))

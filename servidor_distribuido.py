@@ -37,24 +37,25 @@ class Worker():
             print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
             sys.exit()
 
-        self.input = [self.server, sys.stdin]
+        self.inputs = [self.server, sys.stdin]
+        self.running = False
 
         # initialize gpio, ports and related states
         self.initial_state()
 
     def initial_state(self):
         # GPIO.setmode(GPIO.BCM)
-        self.light_1 = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.L_01.value)["gpio"],
-        self.light_2 = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.L_02.value)["gpio"],
-        self.air_conditioning = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.AC.value)["gpio"]
-        self.projector = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.PR.value)["gpio"]
-        self.alarm = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.AL_BZ.value)["gpio"]
-        self.presence_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SPres.value)["gpio"]
-        self.smoke_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SFum.value)["gpio"]
-        self.window_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SJan.value)["gpio"]
-        self.door_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SPor.value)["gpio"]
-        self.entry_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SC_IN.value)["gpio"]
-        self.exit_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SC_OUT.value)["gpio"]
+        self.light_1 = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.L_01.value)["gpio"],
+        self.light_2 = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.L_02.value)["gpio"],
+        self.air_conditioning = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.AC.value)["gpio"]
+        self.projector = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.PR.value)["gpio"]
+        self.alarm = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.AL_BZ.value)["gpio"]
+        self.presence_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SPres.value)["gpio"]
+        self.smoke_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SFum.value)["gpio"]
+        self.window_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SJan.value)["gpio"]
+        self.door_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SPor.value)["gpio"]
+        self.entry_people_counting_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SC_IN.value)["gpio"]
+        self.exit_people_counting_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SC_OUT.value)["gpio"]
         self.temperature_sensor = self.config_data["sensor_temperatura"]["gpio"]
         self.states = utils.get_initial_state()
         self.entry = 0
@@ -142,26 +143,49 @@ class Worker():
 
     def start(self):
         print(f"Conectado ao servidor central.\nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
+        self.running = True
         self._run()
 
     def exit(self, message):
         print(message)
-        self.input.remove(self.server)
-        self.input.remove(sys.stdin)
+        self.inputs = []
+        self.running = False
         self.server.close()
 
+    def _try_to_reconnect(self, message):
+        print(message)
+        self.running = False
+        self.server.detach()
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        for i in range(10):
+            print(f"Tentativa de reconexão {i + 1} de 10.")
+            try:
+                self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
+                self.server.send(utils.encode_message(type="worker_identify", id=self.id_on_server))
+            except Exception as e:
+                sleep(2)
+                continue
+            
+            self.inputs = [sys.stdin, self.server]
+            self.running = True
+            print(f"\nServidor central de volta ao ar.\nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
+            self._run()
+            return
+
+        self.exit("Tentativas falharam, desconectando esse servidor.")
+    
     def _run(self):
-        while self.input:
-            inputs, _, _ = select.select(self.input,[],[])
+        while self.running:
+            inputs, _, _ = select.select(self.inputs,[],[])
 
             for input in inputs:
                 self._handle_input(input)
 
     def _handle_input(self, inputs):
         if inputs == self.server:
-            data = inputs.recv(1024).decode("utf-8")
+            data = inputs.recv(2048).decode("utf-8")
             if data == "":
-                self.exit("servidor central foi desligado\nSaindo...")
+                threading.Thread(target=self._try_to_reconnect("servidor central foi desligado ou caiu")).start()
                 return
             json_data = json.loads(data)
             self._decode_server_message(json_data)
@@ -172,6 +196,8 @@ class Worker():
                 
 
     def _decode_server_message(self, json_msg):
+        if(json_msg["type"] == "invalid_id"):
+            self.exit("O ip e nome da sala que estao no arquivo de configuracao json ja estao em uso")
         if (json_msg["type"] == "trigger"):
             print("triggered")
             # self.trigger...
@@ -188,5 +214,7 @@ class Worker():
                     type="confirmation", worker_id=self.id_on_server, 
                     states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value, utils.Sensor.AC.value, utils.Sensor.PR.value, utils.Sensor.AL_BZ.value],
                     values = [0, 0, 0, 0, 0]))
+        elif (json_msg["type"] ==  "states_backup"):
+            self.states = json_msg["states"]
         else:
-            print("mensagem desconhecida")
+            pass

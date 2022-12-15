@@ -196,8 +196,9 @@ class Server():
 
     def _handle_exceptions(self, exceptions: socket.socket):
         self.inputs.remove(exceptions)
-        if exceptions in self.workers:
-            self.workers.remove(exceptions)
+        worker_to_remove = utils.find_worker_by_conn(self.workers, exceptions)
+        if worker_to_remove:
+            self.workers.remove(worker_to_remove)
         exceptions.close()
 
     def _manage_connection(self, s):
@@ -210,17 +211,32 @@ class Server():
         print(conn, "Desconectado")
 
         self.inputs.remove(conn)
+        worker_to_remove = utils.find_worker_by_conn(self.workers, conn)
+        if worker_to_remove:
+            self.workers.remove(worker_to_remove)
         conn.close()
 
-    def _decode_worker_message(self, json_msg, conn):
-        if (json_msg["type"] == "worker_identify"):            
+    def _decode_worker_message(self, json_msg, conn: socket.socket):
+        if (json_msg["type"] == "worker_identify"):
             worker_id = json_msg["id"]
-            self.workers.append(ServerWorker({"id": worker_id, "conn": conn, "name": worker_id.split(':')[1]}))
-            self.states[worker_id] = utils.get_initial_state()
 
+            # Verify if id is already connected
+            if utils.find_worker_by_id(self.workers, worker_id):
+                conn.sendall(utils.encode_message(type="invalid_id", message="Already in use"))
+                self.inputs.remove(conn)
+                conn.close()
+                return
+
+            self.workers.append(ServerWorker({"id": worker_id, "conn": conn, "name": worker_id.split(':')[1]}))
             if(len(self.workers) == 1): # First connection on the server
                 print("A primeira conexao com o servidor foi feita.\n")
                 self.show_menu()
+
+            if worker_id in self.states:
+                conn.sendall(utils.encode_message(type="states_backup", states=self.states[worker_id]))
+            else:
+                self.states[worker_id] = utils.get_initial_state()
+
         elif (json_msg["type"] == "confirmation"):
             worker_id = json_msg["worker_id"]
             for index, state in enumerate(list(json_msg["states_id"])):
