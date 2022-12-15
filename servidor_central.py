@@ -41,7 +41,7 @@ class Server():
         return
 
     def show_menu(self):
-        print("", "------------------------------------------------", "Bem vindo ao menu principal, o que deseja fazer:", *menu_options.ask_main_menu(), "", sep="\n")
+        print("", "------------------------------------------------", "Voce esta no menu principal, o que deseja fazer:", *menu_options.ask_main_menu(), "", sep="\n")
 
     def menu(self):
         if len(self.workers) == 0:
@@ -58,12 +58,21 @@ class Server():
         if option == 0:
             self.close()
         elif option == 1:
-            print(self.states)
+            self._show_states()
         elif option == 2:
             self._define_worker()
             pass
         else:
             pass
+    
+    def _show_states(self):
+        people_total = 0
+        for worker in self.workers:
+            print(f"\n{worker.name}:")
+            utils.show_state(self.states[worker.id])
+            people_total += self.states[worker.id][utils.Sensor.SC_IN.value] - self.states[worker.id][utils.Sensor.SC_OUT.value]
+        print(f"Total de pessoas no prédio: {people_total} pessoas")
+        self.show_menu()
 
     def _define_worker(self):
         workers_size = len(self.workers)
@@ -97,23 +106,23 @@ class Server():
         if option == 0:
             return
         elif option == 1:
-            value_to_trigger = 0 if self.states[worker.id]["L_01"] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger", state_id="L_01", value=value_to_trigger))
+            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.L_01.value] == 1 else 1
+            worker.conn.sendall(utils.encode_message(type="trigger", state_id=utils.Sensor.L_01.value, value=value_to_trigger))
         elif option == 2:
-            value_to_trigger = 0 if self.states[worker.id]["L_02"] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger", state_id="L_02", value=value_to_trigger))
+            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.L_02.value] == 1 else 1
+            worker.conn.sendall(utils.encode_message(type="trigger", state_id=utils.Sensor.L_02.value, value=value_to_trigger))
         elif option == 3:
-            value_to_trigger = 0 if self.states[worker.id]["AC"] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger", state_id="AC", value=value_to_trigger))
+            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.AC.value] == 1 else 1
+            worker.conn.sendall(utils.encode_message(type="trigger", state_id=utils.Sensor.AC.value, value=value_to_trigger))
         elif option == 4:
-            value_to_trigger = 0 if self.states[worker.id]["PR"] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger", state_id="PR", value=value_to_trigger))
+            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.PR.value] == 1 else 1
+            worker.conn.sendall(utils.encode_message(type="trigger", state_id=utils.Sensor.PR.value, value=value_to_trigger))
         elif option == 5:
-            value_to_trigger = 0 if self.states[worker.id]["AL_BZ"] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger", state_id="AL_BZ", value=value_to_trigger))
+            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.AL_BZ.value] == 1 else 1
+            worker.conn.sendall(utils.encode_message(type="trigger", state_id=utils.Sensor.AL_BZ.value, value=value_to_trigger))
         elif option == 6:
-            value_to_trigger = 0 if self.states[worker.id]["SFum"] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger", state_id="SFum", value=value_to_trigger))
+            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.SFum.value] == 1 else 1
+            worker.conn.sendall(utils.encode_message(type="trigger", state_id=utils.Sensor.SFum.value, value=value_to_trigger))
         elif option == 7:
             worker.conn.sendall(utils.encode_message(type="turn_on_all_lights"))
         elif option == 8:
@@ -214,16 +223,15 @@ class Server():
                 self.show_menu()
         elif (json_msg["type"] == "confirmation"):
             worker_id = json_msg["worker_id"]
-            # self.turn_on_all_lights...
             for index, state in enumerate(list(json_msg["states_id"])):
                 self.states[worker_id][state] = list(json_msg["values"])[index]
-                #breakpoint()
             self.waiting_response -= 1
         else:
-            print("mensagem desconhecida")
+            print(json_msg)
 
 class ServerWorker(object):
     def __init__(self, *initial_data, **kwargs):
+        # id, conn, name
         for dict in initial_data:
             for key in dict:
                 setattr(self, key, dict[key])

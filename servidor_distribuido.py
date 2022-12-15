@@ -44,28 +44,28 @@ class Worker():
 
     def initial_state(self):
         # GPIO.setmode(GPIO.BCM)
-        self.light_1 = utils.get_obj_by_id(self.config_data["outputs"], "L_01")["gpio"],
-        self.light_2 = utils.get_obj_by_id(self.config_data["outputs"], "L_02")["gpio"],
-        self.air_conditioning = utils.get_obj_by_id(self.config_data["outputs"], "AC")["gpio"]
-        self.projector = utils.get_obj_by_id(self.config_data["outputs"], "PR")["gpio"]
-        self.alarm = utils.get_obj_by_id(self.config_data["outputs"], "AL_BZ")["gpio"]
-        self.presence_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SPres")["gpio"]
-        self.smoke_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SFum")["gpio"]
-        self.window_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SJan")["gpio"]
-        self.door_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SPor")["gpio"]
-        self.entry_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SC_IN")["gpio"]
-        self.exit_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], "SC_OUT")["gpio"]
+        self.light_1 = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.L_01.value)["gpio"],
+        self.light_2 = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.L_02.value)["gpio"],
+        self.air_conditioning = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.AC.value)["gpio"]
+        self.projector = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.PR.value)["gpio"]
+        self.alarm = utils.get_obj_by_id(self.config_data["outputs"], utils.Sensor.AL_BZ.value)["gpio"]
+        self.presence_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SPres.value)["gpio"]
+        self.smoke_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SFum.value)["gpio"]
+        self.window_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SJan.value)["gpio"]
+        self.door_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SPor.value)["gpio"]
+        self.entry_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SC_IN.value)["gpio"]
+        self.exit_people_counting_sensor = utils.get_obj_by_id(self.config_data["inputs"], utils.Sensor.SC_OUT.value)["gpio"]
         self.temperature_sensor = self.config_data["sensor_temperatura"]["gpio"]
         self.states = utils.get_initial_state()
         self.entry = 0
 
         # self.input_sensors = {
-        #     self.presence_sensor: {"name": "SPres", "callback_func": self._presence_sensor_callback},
-        #     self.smoke_sensor: {"name": "SFum", "callback_func": self._smoke_sensor_callback},
-        #     self.window_sensor: {"name": "SJan", "callback_func": self._window_sensor_callback},
-        #     self.door_sensor: {"name": "SPor", "callback_func": self._door_sensor_callback},
-        #     self.entry_people_counting_sensor: {"name": "SC_IN", "callback_func": self._entry_sensor_callback},
-        #     self.exit_people_counting_sensor : {"name": "SC_OUT", "callback_func": self._exit_sensor_callback},
+        #     self.presence_sensor: {"name": utils.Sensor.SPres.value, "callback_func": self._presence_sensor_callback},
+        #     self.smoke_sensor: {"name": utils.Sensor.SFum.value, "callback_func": self._smoke_sensor_callback},
+        #     self.window_sensor: {"name": utils.Sensor.SJan.value, "callback_func": self._window_sensor_callback},
+        #     self.door_sensor: {"name": utils.Sensor.SPor.value, "callback_func": self._door_sensor_callback},
+        #     self.entry_people_counting_sensor: {"name": utils.Sensor.SC_IN.value, "callback_func": self._entry_sensor_callback},
+        #     self.exit_people_counting_sensor : {"name": utils.Sensor.SC_OUT.value, "callback_func": self._exit_sensor_callback},
         # }
 
     # def turn_on_off_projector(self):
@@ -109,7 +109,7 @@ class Worker():
 
     # def _entry_sensor_callback(self, sensor):
     #     print("entrei: ", sensor)
-    #     self.states["SC_IN"] = 1
+    #     self.states[utils.Sensor.SC_IN.value] = 1
     #     self.entry += 1
     #     print(self.entry)
     #     self.restart_sensor_event_detection(sensor, self._entry_sensor_callback)
@@ -168,7 +168,7 @@ class Worker():
         else:
             message = input()
             if message == "1":
-                self.server.send(utils.encode_message(type="states_refresh", worker_id=self.id_on_server, states=self.states, time= str(datetime.now())))
+                self.server.send(utils.encode_message(type="states_refresh", worker_id=self.id_on_server, states=self.states))
                 
 
     def _decode_server_message(self, json_msg):
@@ -179,10 +179,14 @@ class Worker():
             self.states[state_id] = json_msg["value"]
             self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=[state_id], values = [json_msg["value"]]))
         elif (json_msg["type"] == "turn_on_all_lights"):
-            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=["L_01", "L_02"], values = [1, 1]))
+            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value], values = [1, 1]))
         elif (json_msg["type"] == "turn_off_all_lights"):
-            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=["L_01", "L_02"], values = [0, 0]))
+            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value], values = [0, 0]))
         elif (json_msg["type"] == "turn_off_all"):
-            self.server.send(utils.encode_message(type="confirmation", worker_id=self.id_on_server, states_id=["L_01", "L_02", "AC", "PR", "AL_BZ"], values = [0, 0, 0, 0, 0]))
+            self.server.send(
+                utils.encode_message(
+                    type="confirmation", worker_id=self.id_on_server, 
+                    states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value, utils.Sensor.AC.value, utils.Sensor.PR.value, utils.Sensor.AL_BZ.value],
+                    values = [0, 0, 0, 0, 0]))
         else:
             print("mensagem desconhecida")

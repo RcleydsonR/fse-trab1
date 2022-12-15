@@ -21,7 +21,7 @@
         },
         {
             "id": "AC",
-            "tag": "Ar-Condicionado (1º Andar)",
+            "tag": "Ar-Condicionado",
             "gpio": 24
         },
         {

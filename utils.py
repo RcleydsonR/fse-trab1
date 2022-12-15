@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 
 def get_obj_by_id(object_list: list, id_to_find: str):
     return next(
@@ -6,21 +7,64 @@ def get_obj_by_id(object_list: list, id_to_find: str):
         None
     )
 
+class Sensor(Enum):
+    L_01 = "L_01"
+    L_02 = "L_02"
+    AC = "AC"
+    PR = "PR"
+    AL_BZ = "AL_BZ"
+    SPres = "SPres"
+    SFum = "SFum"
+    SJan = "SJan"
+    SPor = "SPor"
+    SC_IN = "SC_IN"
+    SC_OUT = "SC_OUT"
+    Temperature = "Temperature"
+    Humidity = "Humidity"
+
+class SensorName(Enum):
+    L_01 = "Lâmpada 01"
+    L_02 = "Lâmpada 02"
+    AC = "Ar-Condicionado"
+    PR = "Projetor Multimidia"
+    AL_BZ = "Sirene do Alarme"
+    SPres = "Sensor de Presença"
+    SFum = "Sensor de Fumaça"
+    SJan = "Sensor de Janela"
+    SPor = "Sensor de Porta"
+    SC_IN = "Sensor de Contagem de Pessoas Entrada"
+    SC_OUT = "Sensor de Contagem de Pessoas Saída"
+    Temperature = "Temperatura"
+    Humidity = "Umidade"
+
+def show_state(state):
+    show_mode = 0
+    people_inside = state[Sensor.SC_IN.value] - state[Sensor.SC_OUT.value]
+    for key, value in state.items():
+        if show_mode == 0:
+            print(f"\t{SensorName[key].value}: {'Desligado(a)' if value == 0 else 'Ligado(a)'}")
+            if key == Sensor.SPor.value:
+                show_mode = 1
+        else:
+            print(f"\t{SensorName[key].value}: {value}")
+    print(f"\tTotal de pessoas na sala: {people_inside} pessoas")
+    print()
+
 def get_initial_state():
     return {
-        "L_01": 0,
-        "L_02": 0,
-        "AC": 0,
-        "PR": 0,
-        "AL_BZ": 0,
-        "SPres": 0,
-        "SFum": 0,
-        "SJan": 0,
-        "SPor": 0,
-        "SC_IN": 0,
-        "SC_OUT": 0,
-        "Temperature": 0,
-        "Humidity": 0
+        Sensor.L_01.value: 0,
+        Sensor.L_02.value: 0,
+        Sensor.AC.value: 0,
+        Sensor.PR.value: 0,
+        Sensor.AL_BZ.value: 0,
+        Sensor.SPres.value: 0,
+        Sensor.SFum.value: 0,
+        Sensor.SJan.value: 0,
+        Sensor.SPor.value: 0,
+        Sensor.SC_IN.value: 13,
+        Sensor.SC_OUT.value: 2,
+        Sensor.Temperature.value: 0,
+        Sensor.Humidity.value: 0
     }
 
 def encode_message(**data):
