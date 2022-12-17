@@ -23,6 +23,8 @@ def ask_worker(workers):
         *[f"[{index + 1}] - {worker.name}" for index, worker in enumerate(workers)],
         f"[{len(workers) + 1}] - Ligar todas as lampadas do predio",
         f"[{len(workers) + 2}] - Desligar todas as cargas do predio (Lampadas, projetores e aparelhos de Ar-Condicionado)",
+        f"[{len(workers) + 3}] - Ligar o sistema de alarme do prédio",
+        f"[{len(workers) + 4}] - Desligar o sistema de alarme do prédio",
     ]
 
 def ask_command(states):
@@ -32,11 +34,12 @@ def ask_command(states):
         f"[2] - Acionar lampada 2 - {'Desligada' if states['L_02'] == 0 else 'Ligada'}",
         f"[3] - Acionar ar condicionado - {'Desligado' if states['AC'] == 0 else 'Ligado'}",
         f"[4] - Acionar projetor - {'Desligado' if states['PR'] == 0 else 'Ligado'}",
-        f"[5] - Acionar sistema de alarme - {'Desligado' if states['AL_BZ'] == 0 else 'Ligado'}",
+        f"[5] - Acionar sirene do alarme - {'Desligado' if states['AL_BZ'] == 0 else 'Ligado'}",
         f"[6] - Acionar alarme de incendio - {'Desligado' if states['SFum'] == 0 else 'Ligado'}",
-        "[7] - Ligar todas as lampadas",
-        "[8] - Desligar todas as lampadas",
-        "[9] - Desligar todas as cargas (Lampadas, projetores e aparelhos de Ar-Condicionado)"
+        f"[7] - Acionar sistema de alarme - {'Desligado' if states['Alarme'] == 0 else 'Ligado'}",
+        "[8] - Ligar todas as lampadas",
+        "[9] - Desligar todas as lampadas",
+        "[10] - Desligar todas as cargas (Lampadas, projetores e aparelhos de Ar-Condicionado)"
     ]
 
 # print(ask_worker(5))

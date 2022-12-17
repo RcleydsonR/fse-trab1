@@ -33,6 +33,7 @@ class Sensor(Enum):
     SC_OUT = "SC_OUT"
     Temperature = "Temperature"
     Humidity = "Humidity"
+    Alarme = "Alarme"
 
 class SensorName(Enum):
     L_01 = "Lâmpada 01"
@@ -48,17 +49,15 @@ class SensorName(Enum):
     SC_OUT = "Sensor de Contagem de Pessoas Saída"
     Temperature = "Temperatura"
     Humidity = "Umidade"
+    Alarme = "Sistema de Alarme"
 
 def show_state(state):
-    show_mode = 0
     people_inside = state[Sensor.SC_IN.value] - state[Sensor.SC_OUT.value]
     for key, value in state.items():
-        if show_mode == 0:
-            print(f"\t{SensorName[key].value}: {'Desligado(a)' if value == 0 else 'Ligado(a)'}")
-            if key == Sensor.SPor.value:
-                show_mode = 1
-        else:
+        if key in [Sensor.SPor.value, Sensor.SC_IN.value, Sensor.SC_OUT.value, Sensor.Temperature.value, Sensor.Humidity.value]:
             print(f"\t{SensorName[key].value}: {value}")
+        else:
+            print(f"\t{SensorName[key].value}: {'Desligado(a)' if value == 0 else 'Ligado(a)'}")
     print(f"\tTotal de pessoas na sala: {people_inside} pessoas")
     print()
 
@@ -73,10 +72,11 @@ def get_initial_state():
         Sensor.SFum.value: 0,
         Sensor.SJan.value: 0,
         Sensor.SPor.value: 0,
-        Sensor.SC_IN.value: 13,
-        Sensor.SC_OUT.value: 2,
+        Sensor.SC_IN.value: 0,
+        Sensor.SC_OUT.value: 0,
         Sensor.Temperature.value: 0,
-        Sensor.Humidity.value: 0
+        Sensor.Humidity.value: 0,
+        Sensor.Alarme.value: 0
     }
 
 def encode_message(**data):
