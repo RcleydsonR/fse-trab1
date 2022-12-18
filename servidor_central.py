@@ -25,6 +25,8 @@ class Server():
         self.workers = []
         self.states = {}
         self.waiting_response = 0
+        self.step = utils.Steps.MENU.value
+        self.selected_worker = -1
 
     def start(self):
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -43,16 +45,30 @@ class Server():
     def show_menu(self):
         print("", "------------------------------------------------", "Voce esta no menu principal, o que deseja fazer:", *menu_options.ask_main_menu(), "", sep="\n")
 
-    def menu(self):
+    def _handle_stdin(self, option):
+        try:
+            opt = int(option)
+        except ValueError:
+            print("Por favor, digite um valor inteiro")
+            return
+        
+        if self.step == utils.Steps.MENU.value:
+            self._menu(opt)
+        elif self.step == utils.Steps.TRIGGER.value:
+            self._define_trigger(opt)
+        else:
+            self._define_command(opt)
+
+
+    def _menu(self, option):
         if len(self.workers) == 0:
-            input()
             print("Aguardando algum servidor distribuido se conectar\n")
             return
 
         possible_options = [i for i in range(len(menu_options.ask_main_menu()))]
-        option = utils.get_valid_option(possible_options, menu_options.ask_main_menu())
 
-        self._handle_main_menu_opt(option)
+        if utils.is_option_valid(possible_options, menu_options.ask_main_menu(), option):
+            self._handle_main_menu_opt(option)
 
     def _handle_main_menu_opt(self, option):
         if option == 0:
@@ -60,7 +76,8 @@ class Server():
         elif option == 1:
             self._show_states()
         elif option == 2:
-            self._define_worker()
+            print("Qual o servidor ou opcao:", *menu_options.ask_worker(self.workers), "", sep="\n")
+            self.step = utils.Steps.TRIGGER.value
             pass
         else:
             pass
@@ -72,22 +89,25 @@ class Server():
             utils.show_state(self.states[worker.id])
             people_total += self.states[worker.id][utils.Sensor.SC_IN.value] - self.states[worker.id][utils.Sensor.SC_OUT.value]
         print(f"Total de pessoas no prédio: {people_total} pessoas")
-        self.show_menu()
+        self.show_menu()        
 
-    def _define_worker(self):
+    def _define_trigger(self, option):
         workers_size = len(self.workers)
-        print("Qual o servidor ou opcao:", *menu_options.ask_worker(self.workers), "", sep="\n")
         possible_options = [0, *[i + 1 for i in range(workers_size + 4)]]
 
-        option = utils.get_valid_option(possible_options, menu_options.ask_worker(self.workers))
+        if not utils.is_option_valid(possible_options, menu_options.ask_worker(self.workers), option):
+            return -1
 
         if(option == 0):
             print()
             self.show_menu()
+            self.step = utils.Steps.MENU.value
             return
         
         if option <= workers_size:
-            self._define_trigger(self.workers[option - 1])
+            self.selected_worker = self.workers[option - 1]
+            print("O que deseja fazer:", *menu_options.ask_command(self.states[self.selected_worker.id]), "", sep="\n")
+            self.step = utils.Steps.COMMAND.value
         elif option == workers_size + 1:
             self._send_all_workers_command(utils.encode_message(type="turn_on_all_lights"))
         elif option == workers_size + 2:
@@ -97,17 +117,16 @@ class Server():
         else:
             self._send_all_workers_command(utils.encode_message(type="trigger_alarm", value=0))
 
-    def _define_trigger(self, worker):
-        ask_command = menu_options.ask_command(self.states[worker.id])
-        print("O que deseja fazer:", *ask_command, "", sep="\n")
+    def _define_command(self, option):
+        ask_command = menu_options.ask_command(self.states[self.selected_worker.id])
         possible_options = [*[i for i in range(len(ask_command))]]
-        option = utils.get_valid_option(possible_options, ask_command)
-
-        self._handle_triggered_action(worker, option)
-        return
+        if utils.is_option_valid(possible_options, ask_command, option):
+            self._handle_triggered_action(self.selected_worker, option)
     
     def _handle_triggered_action(self, worker, option):
         if option == 0:
+            print("Qual o servidor ou opcao:", *menu_options.ask_worker(self.workers), "", sep="\n")
+            self.step = utils.Steps.TRIGGER.value
             return
         elif option == 1:
             value_to_trigger = 0 if self.states[worker.id][utils.Sensor.L_01.value] == 1 else 1
@@ -142,17 +161,18 @@ class Server():
     def _load_animation(self):
         timeout = 0
         breaked_by_timeout = False
-        steps = ['|', '/', '-', '\\']
+        loading_steps = ['|', '/', '-', '\\']
+        self.step = utils.Steps.MENU.value
 
         while self.waiting_response != 0:
-            for step in steps:
+            for loading_step in loading_steps:
                 if self.waiting_response != 0:
                     break
                 if timeout == 20:
                     breaked_by_timeout = True
                     self.waiting_response = 0
                     break
-                print(f"\rAguardando confirmacao do comando {step}", end=" ")
+                print(f"\rAguardando confirmacao do comando {loading_step}", end=" ")
                 sleep(0.25)
                 timeout += 1
         
@@ -160,6 +180,7 @@ class Server():
             print(f"\rComando nao confirmado (Timeout exceed) ", u'\u2717', end=" ")
         else:
             print(f"\rComando confirmado com sucesso ", u'\u2713', "   ", end=" ")
+        
         self.show_menu()
         return
 
@@ -187,18 +208,20 @@ class Server():
         if inputs is self.server:
             self._manage_connection(inputs)
         elif isinstance(inputs, socket.socket):
-            data = inputs.recv(4096).decode("utf-8")
+            data = inputs.recv(2048).decode("utf-8")
             if data == "":
                 self._close_connection(inputs)
                 return
             else:
-                json_data = json.loads(data)
-                self._decode_worker_message(json_data, inputs)
+                for json_decodable in utils.decode_recv_message(data):
+                    json_data = json.loads(json_decodable)
+                    self._decode_worker_message(json_data, inputs)
         else:
+            option = input()
             if self.waiting_response != 0:
-                input()
+                pass
             else:
-                self.menu()
+                self._handle_stdin(option)
 
     def _handle_exceptions(self, exceptions: socket.socket):
         self.inputs.remove(exceptions)

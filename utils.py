@@ -19,6 +19,11 @@ def find_worker_by_id(workers: list, id):
             return worker
     return None
 
+class Steps(Enum):
+    MENU = "MENU"
+    TRIGGER = "TRIGGER"
+    COMMAND = "COMMAND"
+
 class Sensor(Enum):
     L_01 = "L_01"
     L_02 = "L_02"
@@ -85,14 +90,18 @@ def encode_message(**data):
         encoded_json[key] = value
     return bytes(json.dumps(encoded_json), encoding='utf-8')
 
-def get_valid_option(possible_option, show_possible_option):
-    option = -1
-    while not(option in possible_option):
-        try:
-            option = int(input())
-        except ValueError:
-            print("Por favor, digite um valor inteiro")
-        if option in possible_option:
-            break
+def is_option_valid(possible_option, show_possible_option, option):
+    is_valid = True
+    if not(option in possible_option):
         print("Opcao invalida, digite novamente, opcoes disponiveis:", *show_possible_option, "", sep="\n")
-    return option
+        is_valid = False
+    return is_valid
+
+def decode_recv_message(data):
+    data_list = []
+    while data.find('type', 0, 10) != -1:
+        end_index = data.find('type', 11, len(data))
+        end_index = end_index - 2 if end_index != -1 else len(data)
+        data_list.append(data[0:end_index])
+        data = data[end_index:len(data)]
+    return data_list
