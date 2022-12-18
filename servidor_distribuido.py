@@ -45,11 +45,13 @@ class Worker():
 
     def initial_state(self):
         GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+
         self.light_1 = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.L_01.value)["gpio"],
         self.light_2 = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.L_02.value)["gpio"],
         self.air_conditioning = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.AC.value)["gpio"]
         self.projector = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.PR.value)["gpio"]
-        self.alarm = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.AL_BZ.value)["gpio"]
+        self.alarm_buzzer = utils.get_obj_by_element(self.config_data["outputs"], 'id', utils.Sensor.AL_BZ.value)["gpio"]
         self.presence_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SPres.value)["gpio"]
         self.smoke_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SFum.value)["gpio"]
         self.window_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SJan.value)["gpio"]
@@ -57,8 +59,6 @@ class Worker():
         self.entry_people_counting_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SC_IN.value)["gpio"]
         self.exit_people_counting_sensor = utils.get_obj_by_element(self.config_data["inputs"], 'id', utils.Sensor.SC_OUT.value)["gpio"]
         self.temperature_sensor = self.config_data["sensor_temperatura"]["gpio"]
-        self.states = utils.get_initial_state()
-        self.entry = 0
 
         self.input_sensors = {
             self.presence_sensor: {"id": utils.Sensor.SPres.value, "callback_func": self._presence_sensor_callback},
@@ -69,12 +69,33 @@ class Worker():
             self.exit_people_counting_sensor : {"id": utils.Sensor.SC_OUT.value, "callback_func": self._exit_sensor_callback},
         }
 
-    def _setup_outputs(self):
+        self._setup_sensors()
+
+        self.states = {
+            utils.Sensor.L_01.value: GPIO.input(self.light_1[0]),
+            utils.Sensor.L_02.value: GPIO.input(self.light_2[0]),
+            utils.Sensor.AC.value: GPIO.input(self.air_conditioning),
+            utils.Sensor.PR.value: GPIO.input(self.projector),
+            utils.Sensor.AL_BZ.value: GPIO.input(self.alarm_buzzer),
+            utils.Sensor.SPres.value: GPIO.input(self.presence_sensor),
+            utils.Sensor.SFum.value: GPIO.input(self.smoke_sensor),
+            utils.Sensor.SJan.value: GPIO.input(self.window_sensor),
+            utils.Sensor.SPor.value: GPIO.input(self.door_sensor),
+            utils.Sensor.SC_IN.value: GPIO.input(self.entry_people_counting_sensor),
+            utils.Sensor.SC_OUT.value: GPIO.input(self.exit_people_counting_sensor),
+            utils.Sensor.Temperature.value: 0,
+            utils.Sensor.Humidity.value: 0,
+            utils.Sensor.Alarme.value: 0
+        }
+
+    def _setup_sensors(self):
         GPIO.setup(self.light_1, GPIO.OUT)
         GPIO.setup(self.light_2, GPIO.OUT)
         GPIO.setup(self.air_conditioning, GPIO.OUT)
         GPIO.setup(self.projector, GPIO.OUT)
-        GPIO.setup(self.alarm, GPIO.OUT)
+        GPIO.setup(self.alarm_buzzer, GPIO.OUT)
+        for sensor in self.input_sensors:
+            GPIO.setup(sensor, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
     def turn_on_off_outputs(self, output_ids, value):
         outputs = []
@@ -91,8 +112,8 @@ class Worker():
     def verifyTemperature(self):
         humidity, temperature = Adafruit_DHT.read_retry(22, self.temperature_sensor)
         if humidity is not None and temperature is not None:
-            self.states["Temperature"] = temperature
-            self.states["Humidity"] = humidity
+            self.states[utils.Sensor.Temperature.value] = temperature
+            self.states[utils.Sensor.Humidity.value] = humidity
             self._send_states_update_message([utils.Sensor.Temperature.value, utils.Sensor.Humidity.value], [temperature, humidity])
     
     def _turn_off_lights_in_15_seconds(self):
@@ -102,6 +123,7 @@ class Worker():
     
     def _apply_presence_sensor_logic(self):
         if GPIO.input(self.presence_sensor) == 1:
+            breakpoint()
             if self.states[utils.Sensor.Alarme.value] == 1:
                 self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1)
             else:
@@ -160,7 +182,6 @@ class Worker():
 
     def input_proc(self):
         for sensor in self.input_sensors:
-            GPIO.setup(sensor, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
             if sensor in [self.entry_people_counting_sensor, self.exit_people_counting_sensor]:
                 GPIO.add_event_detect(sensor, GPIO.RISING, callback=self.input_sensors[sensor]["callback_func"], bouncetime=200)
                 continue
@@ -173,7 +194,6 @@ class Worker():
     def start(self):
         print(f"Conectado ao servidor central.\nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
         self.running = True
-        self._setup_outputs()
         self._run()
 
     def exit(self, message):
@@ -197,7 +217,7 @@ class Worker():
                 sleep(2)
                 continue
             
-            self.inputs = [sys.stdin, self.server]
+            self.inputs = [self.server]
             self.running = True
             print(f"\nServidor central de volta ao ar.\nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
             self._run()
@@ -248,7 +268,9 @@ class Worker():
                     states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value, utils.Sensor.AC.value, utils.Sensor.PR.value, utils.Sensor.AL_BZ.value],
                     values = [0, 0, 0, 0, 0]))
         elif (json_msg["type"] ==  "trigger_alarm"):
-            self.states[utils.Sensor.Alarme] = json_msg["value"]
+            if json_msg["value"] == 0:
+                self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 0)
+            self.states[utils.Sensor.Alarme.value] = json_msg["value"]
             self.server.send(utils.encode_message(type="confirmation", success=True, worker_id=self.id_on_server, states_id=[utils.Sensor.Alarme.value], values = [json_msg["value"]]))
         elif (json_msg["type"] ==  "states_backup"):
             self.states = json_msg["states"]

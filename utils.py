@@ -2,10 +2,10 @@ import json
 from enum import Enum
 
 def get_obj_by_element(object_list: list, element_key: str, element_to_find):
-    return next(
-        (obj for obj in object_list if obj[element_key] == element_to_find),
-        None
-    )
+    for obj in object_list:
+        if obj[element_key] == element_to_find:
+            return obj
+    return None
 
 def find_worker_by_conn(workers: list, conn):
     for worker in workers:
@@ -59,7 +59,7 @@ class SensorName(Enum):
 def show_state(state):
     people_inside = state[Sensor.SC_IN.value] - state[Sensor.SC_OUT.value]
     for key, value in state.items():
-        if key in [Sensor.SPor.value, Sensor.SC_IN.value, Sensor.SC_OUT.value, Sensor.Temperature.value, Sensor.Humidity.value]:
+        if key in [Sensor.SC_IN.value, Sensor.SC_OUT.value, Sensor.Temperature.value, Sensor.Humidity.value]:
             print(f"\t{SensorName[key].value}: {value}")
         else:
             print(f"\t{SensorName[key].value}: {'Desligado(a)' if value == 0 else 'Ligado(a)'}")
@@ -80,8 +80,7 @@ def get_initial_state():
         Sensor.SC_IN.value: 0,
         Sensor.SC_OUT.value: 0,
         Sensor.Temperature.value: 0,
-        Sensor.Humidity.value: 0,
-        Sensor.Alarme.value: 0
+        Sensor.Humidity.value: 0
     }
 
 def encode_message(**data):
