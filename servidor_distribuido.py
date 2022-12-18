@@ -32,12 +32,12 @@ class Worker():
         self.id_on_server = f"{self.config_data['ip_servidor_distribuido']}:{self.config_data['nome']}"
         try:
             self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
-            self.server.sendall(utils.encode_message(type="worker_identify", id=self.id_on_server))
+            self.server.send(utils.encode_message(type="worker_identify", id=self.id_on_server))
         except:
             print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
             sys.exit()
 
-        self.inputs = [self.server, sys.stdin]
+        self.inputs = [self.server]
         self.running = False
 
         # initialize gpio, ports and related states
@@ -89,14 +89,26 @@ class Worker():
         return True
 
     def verifyTemperature(self):
-        while self.running:
-            humidity, temperature = Adafruit_DHT.read_retry(22, self.temperature_sensor)
-            if humidity is not None and temperature is not None:
-                self.states["Temperature"] = temperature
-                self.states["Humidity"] = humidity
-                self._send_states_update_message([utils.Sensor.Temperature.value, utils.Sensor.Humidity.value], [temperature, humidity])
-            sleep(2)
-
+        humidity, temperature = Adafruit_DHT.read_retry(22, self.temperature_sensor)
+        if humidity is not None and temperature is not None:
+            self.states["Temperature"] = temperature
+            self.states["Humidity"] = humidity
+            self._send_states_update_message([utils.Sensor.Temperature.value, utils.Sensor.Humidity.value], [temperature, humidity])
+    
+    def _turn_off_lights_in_15_seconds(self):
+        sleep(15)
+        if GPIO.input(self.presence_sensor) == 0:
+            self.turn_on_off_outputs([utils.Sensor.L_01.value, utils.Sensor.L_02.value], 0)
+    
+    def _apply_presence_sensor_logic(self):
+        if GPIO.input(self.presence_sensor) == 1:
+            if self.states[utils.Sensor.Alarme.value] == 1:
+                self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1)
+            else:
+                self.turn_on_off_outputs([utils.Sensor.L_01.value, utils.Sensor.L_02.value], 1)
+        else:
+            threading.Thread(target=self._turn_off_lights_in_15_seconds()).start()
+    
     def apply_sensor_transition(self, sensor):
         new_state = 1 if GPIO.input(sensor) else 0
         self.states[self.input_sensors[sensor]["id"]] = new_state
@@ -108,6 +120,7 @@ class Worker():
 
     def _presence_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
+        self._apply_presence_sensor_logic()
         self._send_states_update_message([utils.Sensor.SPres.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._presence_sensor_callback)
 
@@ -154,7 +167,8 @@ class Worker():
             GPIO.add_event_detect(sensor, GPIO.BOTH, callback=self.input_sensors[sensor]["callback_func"], bouncetime=200)
 
         while self.running:
-            sleep(10)
+            self.verifyTemperature()
+            sleep(2)
 
     def start(self):
         print(f"Conectado ao servidor central.\nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
@@ -164,8 +178,8 @@ class Worker():
 
     def exit(self, message):
         print(message)
-        self.inputs = []
         self.running = False
+        self.inputs = []
         GPIO.cleanup()
         self.server.close()
 
@@ -178,7 +192,7 @@ class Worker():
             print(f"Tentativa de reconexão {i + 1} de 10.")
             try:
                 self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
-                self.server.sendall(utils.encode_message(type="worker_identify", states=self.states, id=self.id_on_server))
+                self.server.send(utils.encode_message(type="worker_identify", states=self.states, id=self.id_on_server))
             except Exception as e:
                 sleep(2)
                 continue
@@ -206,11 +220,9 @@ class Worker():
                 return
             json_data = json.loads(data)
             self._decode_server_message(json_data)
-        else:
-            input()
                 
     def _send_states_update_message(self, states_id, values):
-        self.server.sendall(
+        self.server.send(
             utils.encode_message(
                 type="states_update", worker_id=self.id_on_server, states_id=states_id, values = values
         ))
@@ -221,23 +233,23 @@ class Worker():
         if (json_msg["type"] == "trigger_output"):
             state_id = json_msg["state_id"]
             command = self.turn_on_off_outputs([state_id], json_msg["value"])
-            self.server.sendall(utils.encode_message(type="confirmation", success=command, worker_id=self.id_on_server, states_id=[state_id], values = [json_msg["value"]]))
+            self.server.send(utils.encode_message(type="confirmation", success=command, worker_id=self.id_on_server, states_id=[state_id], values = [json_msg["value"]]))
         elif (json_msg["type"] == "turn_on_all_lights"):
-            command = self.turn_on_off_outputs([utils.Sensor.L_01, utils.Sensor.L_02], 1)
-            self.server.sendall(utils.encode_message(type="confirmation", success=command, worker_id=self.id_on_server, states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value], values = [1, 1]))
+            command = self.turn_on_off_outputs([utils.Sensor.L_01.value, utils.Sensor.L_02.value], 1)
+            self.server.send(utils.encode_message(type="confirmation", success=command, worker_id=self.id_on_server, states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value], values = [1, 1]))
         elif (json_msg["type"] == "turn_off_all_lights"):
-            command = self.turn_on_off_outputs([utils.Sensor.L_01, utils.Sensor.L_02], 0)
-            self.server.sendall(utils.encode_message(type="confirmation", success=command, worker_id=self.id_on_server, states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value], values = [0, 0]))
+            command = self.turn_on_off_outputs([utils.Sensor.L_01.value, utils.Sensor.L_02.value], 0)
+            self.server.send(utils.encode_message(type="confirmation", success=command, worker_id=self.id_on_server, states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value], values = [0, 0]))
         elif (json_msg["type"] == "turn_off_all"):
-            command = self.turn_on_off_outputs([utils.Sensor.L_01, utils.Sensor.L_02, utils.Sensor.AC, utils.Sensor.PR], 0)
-            self.server.sendall(
+            command = self.turn_on_off_outputs([utils.Sensor.L_01.value, utils.Sensor.L_02.value, utils.Sensor.AC.value, utils.Sensor.PR.value], 0)
+            self.server.send(
                 utils.encode_message(
                     type="confirmation", success=command, worker_id=self.id_on_server, 
                     states_id=[utils.Sensor.L_01.value, utils.Sensor.L_02.value, utils.Sensor.AC.value, utils.Sensor.PR.value, utils.Sensor.AL_BZ.value],
                     values = [0, 0, 0, 0, 0]))
         elif (json_msg["type"] ==  "trigger_alarm"):
             self.states[utils.Sensor.Alarme] = json_msg["value"]
-            self.server.sendall(utils.encode_message(type="confirmation", success=True, worker_id=self.id_on_server, states_id=[utils.Sensor.Alarme.value], values = [json_msg["value"]]))
+            self.server.send(utils.encode_message(type="confirmation", success=True, worker_id=self.id_on_server, states_id=[utils.Sensor.Alarme.value], values = [json_msg["value"]]))
         elif (json_msg["type"] ==  "states_backup"):
             self.states = json_msg["states"]
         else:

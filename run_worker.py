@@ -9,7 +9,6 @@ def main(config):
 
     try:
         Thread(target=worker.input_proc).start()
-        Thread(target=worker.verifyTemperature).start()
         worker.start()
     except KeyboardInterrupt:
         worker.exit("\nSaindo do servidor...")
