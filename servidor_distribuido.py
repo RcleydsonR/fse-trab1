@@ -159,11 +159,15 @@ class Worker():
 
     def _window_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
+        if new_state == 1 and self.states[utils.Sensor.Alarme.value] == 1:
+            self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1) 
         self._send_states_update_message([utils.Sensor.SJan.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._window_sensor_callback)
 
     def _door_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
+        if new_state == 1 and self.states[utils.Sensor.Alarme.value] == 1:
+            self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1) 
         self._send_states_update_message([utils.Sensor.SPor.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._door_sensor_callback)
 
