@@ -63,8 +63,12 @@ class SensorName(Enum):
 def show_state(state):
     people_inside = state[Sensor.SC_IN.value] - state[Sensor.SC_OUT.value]
     for key, value in state.items():
-        if key in [Sensor.SC_IN.value, Sensor.SC_OUT.value, Sensor.Temperature.value, Sensor.Humidity.value]:
+        if key in [Sensor.SC_IN.value, Sensor.SC_OUT.value]:
             print(f"\t{SensorName[key].value}: {value}")
+        elif key == Sensor.Temperature.value:
+            print(f"\t{SensorName[key].value}: {value:.2f} ºC")
+        elif key == Sensor.Humidity.value:
+            print(f"\t{SensorName[key].value}: {value:.2f} %")
         else:
             print(f"\t{SensorName[key].value}: {'Desligado(a)' if value == 0 else 'Ligado(a)'}")
     print(f"\tTotal de pessoas na sala: {people_inside} pessoas")

@@ -126,7 +126,8 @@ class Worker():
         if humidity is not None and temperature is not None:
             self.states[utils.Sensor.Temperature.value] = temperature
             self.states[utils.Sensor.Humidity.value] = humidity
-            self._send_states_update_message([utils.Sensor.Temperature.value, utils.Sensor.Humidity.value], [temperature, humidity])
+            if self.running:
+                self._send_states_update_message([utils.Sensor.Temperature.value, utils.Sensor.Humidity.value], [temperature, humidity])
     
     def _turn_off_lights_in_15_seconds(self):
         sleep(15)
@@ -154,7 +155,8 @@ class Worker():
     def _presence_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
         self._apply_presence_sensor_logic()
-        self._send_states_update_message([utils.Sensor.SPres.value], [new_state])
+        if self.running:
+            self._send_states_update_message([utils.Sensor.SPres.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._presence_sensor_callback)
 
     def _smoke_sensor_callback(self, sensor):
@@ -165,32 +167,37 @@ class Worker():
             or new_state == 0 and self.states[utils.Sensor.SJan.value] == 0
             and self.states[utils.Sensor.SPor.value] == 0 and self.states[utils.Sensor.SPres.value] == 0):
             self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 0)
-        self._send_states_update_message([utils.Sensor.SFum.value], [new_state])
+        if self.running:
+            self._send_states_update_message([utils.Sensor.SFum.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._smoke_sensor_callback)
 
     def _window_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
         if new_state == 1 and self.states[utils.Sensor.Alarme.value] == 1:
             self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1) 
-        self._send_states_update_message([utils.Sensor.SJan.value], [new_state])
+        if self.running:
+            self._send_states_update_message([utils.Sensor.SJan.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._window_sensor_callback)
 
     def _door_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
         if new_state == 1 and self.states[utils.Sensor.Alarme.value] == 1:
             self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1) 
-        self._send_states_update_message([utils.Sensor.SPor.value], [new_state])
+        if self.running:
+            self._send_states_update_message([utils.Sensor.SPor.value], [new_state])
         self.restart_sensor_event_detection(sensor, self._door_sensor_callback)
 
     def _entry_sensor_callback(self, sensor):
         self.states[self.input_sensors[sensor]["id"]] += 1
-        self._send_states_update_message([utils.Sensor.SC_IN.value], [self.states[self.input_sensors[sensor]["id"]]])
+        if self.running:
+            self._send_states_update_message([utils.Sensor.SC_IN.value], [self.states[self.input_sensors[sensor]["id"]]])
         GPIO.remove_event_detect(sensor)
         GPIO.add_event_detect(sensor, GPIO.RISING, callback=self._entry_sensor_callback, bouncetime=200)
 
     def _exit_sensor_callback(self, sensor):
         self.states[self.input_sensors[sensor]["id"]] += 1
-        self._send_states_update_message([utils.Sensor.SC_OUT.value], [self.states[self.input_sensors[sensor]["id"]]])
+        if self.running:
+            self._send_states_update_message([utils.Sensor.SC_OUT.value], [self.states[self.input_sensors[sensor]["id"]]])
         self.restart_sensor_event_detection(sensor, self._exit_sensor_callback)
         GPIO.remove_event_detect(sensor)
         GPIO.add_event_detect(sensor, GPIO.RISING, callback=self._entry_sensor_callback, bouncetime=200)
