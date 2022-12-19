@@ -85,7 +85,8 @@ class Worker():
             utils.Sensor.SC_OUT.value: GPIO.input(self.exit_people_counting_sensor),
             utils.Sensor.Temperature.value: 0,
             utils.Sensor.Humidity.value: 0,
-            utils.Sensor.Alarme.value: 0
+            utils.Sensor.Alarme.value: 0,
+            utils.Sensor.Alarme_Incendio.value: 0
         }
 
     def _setup_sensors(self):
@@ -156,7 +157,7 @@ class Worker():
 
     def _smoke_sensor_callback(self, sensor):
         new_state = self.apply_sensor_transition(sensor)
-        if new_state == 1:
+        if new_state == 1 and self.states[utils.Sensor.Alarme_Incendio.value] == 1:
             self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1)
         if ((new_state == 0 and self.states[utils.Sensor.Alarme.value] == 0)
             or new_state == 0 and self.states[utils.Sensor.SJan.value] == 0
@@ -284,6 +285,9 @@ class Worker():
                 self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 0)
             self.states[utils.Sensor.Alarme.value] = json_msg["value"]
             self.server.send(utils.encode_message(type="confirmation", success=True, worker_id=self.id_on_server, states_id=[utils.Sensor.Alarme.value], values = [json_msg["value"]]))
+        elif (json_msg["type"] ==  "trigger_fire_alarm"):
+            self.states[utils.Sensor.Alarme_Incendio.value] = json_msg["value"]
+            self.server.send(utils.encode_message(type="confirmation", success=True, worker_id=self.id_on_server, states_id=[utils.Sensor.Alarme_Incendio.value], values = [json_msg["value"]]))
         elif (json_msg["type"] ==  "verify_trigger_alarm"):
             can_trigger_alarm = True
             value_to_trigger = json_msg["value"]

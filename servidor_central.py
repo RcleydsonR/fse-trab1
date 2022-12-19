@@ -28,7 +28,8 @@ class Server():
         self.step = utils.Steps.MENU.value
         self.selected_worker = -1
         self.states = {
-            utils.Sensor.Alarme.value: 0
+            utils.Sensor.Alarme.value: 0,
+            utils.Sensor.Alarme_Incendio.value: 0
         }
         self.trigger_confirmation_response = 0
         self.trigger_confirmation_error = False
@@ -82,7 +83,7 @@ class Server():
         elif option == 1:
             self._show_states()
         elif option == 2:
-            print("Qual o servidor ou opcao:", *menu_options.ask_worker(self.workers, self.states[utils.Sensor.Alarme.value]), "", sep="\n")
+            print("Qual o servidor ou opcao:", *menu_options.ask_trigger(self.workers, self.states[utils.Sensor.Alarme.value], self.states[utils.Sensor.Alarme_Incendio.value]), "", sep="\n")
             self.step = utils.Steps.TRIGGER.value
             pass
         else:
@@ -95,33 +96,41 @@ class Server():
             utils.show_state(self.states[worker.id])
             people_total += self.states[worker.id][utils.Sensor.SC_IN.value] - self.states[worker.id][utils.Sensor.SC_OUT.value]
         print(f"Total de pessoas no prédio: {people_total} pessoas")
-        print(f"Sistema de alarme do predio - {'Desligado' if self.states[utils.Sensor.Alarme.value] == 0 else 'Ligado'}")
+        print(f"Sistema de alarme do predio: {'Desligado' if self.states[utils.Sensor.Alarme.value] == 0 else 'Ligado'}")
+        print(f"Sistema de alarme de incendio do predio: {'Desligado' if self.states[utils.Sensor.Alarme_Incendio.value] == 0 else 'Ligado'}")
         self.show_menu()        
 
     def _define_trigger(self, option):
         workers_size = len(self.workers)
         possible_options = [0, *[i + 1 for i in range(workers_size + 4)]]
 
-        if not utils.is_option_valid(possible_options, menu_options.ask_worker(self.workers, self.states[utils.Sensor.Alarme.value]), option):
+        if not utils.is_option_valid(possible_options, menu_options.ask_trigger(self.workers, self.states[utils.Sensor.Alarme.value], self.states[utils.Sensor.Alarme_Incendio.value]), option):
             return -1
 
         if(option == 0):
             print()
             self.show_menu()
-            self.step = utils.Steps.MENU.value
             return
         
         if option <= workers_size:
             self.selected_worker = self.workers[option - 1]
-            print("O que deseja fazer:", *menu_options.ask_command(self.states[self.selected_worker.id]), "", sep="\n")
+            print(f"O que deseja fazer na(o) {self.selected_worker.name}:", *menu_options.ask_command(self.states[self.selected_worker.id]), "", sep="\n")
             self.step = utils.Steps.COMMAND.value
+            return
         elif option == workers_size + 1:
             self._send_all_workers_command(utils.encode_message(type="turn_on_all_lights"))
         elif option == workers_size + 2:
             self._send_all_workers_command(utils.encode_message(type="turn_off_all"))
         elif option == workers_size + 3:
             value_to_trigger = 0 if self.states[utils.Sensor.Alarme.value] == 1 else 1
+            self.trigger_confirmation_response = len(self.workers)
             self._send_all_workers_command(utils.encode_message(type="verify_trigger_alarm", value=value_to_trigger))
+        elif option == workers_size + 4:
+            value_to_trigger = 0 if self.states[utils.Sensor.Alarme_Incendio.value] == 1 else 1
+            self.states[utils.Sensor.Alarme_Incendio.value] = value_to_trigger
+            self._send_all_workers_command(utils.encode_message(type="trigger_fire_alarm", value=value_to_trigger))
+        self.waiting_response = len(self.workers)
+        threading.Thread(target=self._load_animation).start()
 
     def _define_command(self, option):
         ask_command = menu_options.ask_command(self.states[self.selected_worker.id])
@@ -131,7 +140,7 @@ class Server():
     
     def _handle_triggered_action(self, worker, option):
         if option == 0:
-            print("Qual o servidor ou opcao:", *menu_options.ask_worker(self.workers), "", sep="\n")
+            print("Qual o servidor ou opcao:", *menu_options.ask_trigger(self.workers, self.states[utils.Sensor.Alarme.value], self.states[utils.Sensor.Alarme_Incendio.value]), "", sep="\n")
             self.step = utils.Steps.TRIGGER.value
             return
         elif option == 1:
@@ -147,17 +156,13 @@ class Server():
             value_to_trigger = 0 if self.states[worker.id][utils.Sensor.PR.value] == 1 else 1
             worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.PR.value, value=value_to_trigger))
         elif option == 5:
-            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.AL_BZ.value] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=value_to_trigger))
-        elif option == 6:
-            value_to_trigger = 0 if self.states[worker.id][utils.Sensor.SFum.value] == 1 else 1
-            worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.SFum.value, value=value_to_trigger))
-        elif option == 7:
             worker.conn.sendall(utils.encode_message(type="turn_on_all_lights"))
-        elif option == 8:
+        elif option == 6:
             worker.conn.sendall(utils.encode_message(type="turn_off_all_lights"))
-        elif option == 9:
+        elif option == 7:
             worker.conn.sendall(utils.encode_message(type="turn_off_all"))
+        
+        self.waiting_response = 1
         threading.Thread(target=self._load_animation).start()
 
 
@@ -194,13 +199,6 @@ class Server():
         return
 
     def _send_all_workers_command(self, encoded_command):
-        for worker in self.workers:
-            worker.conn.sendall(bytes(encoded_command))
-        self.waiting_response = len(self.workers)
-        self.trigger_confirmation_response = len(self.workers)
-        threading.Thread(target=self._load_animation).start()
-
-    def _send_trigger_alarm_command(self, encoded_command):
         for worker in self.workers:
             worker.conn.sendall(bytes(encoded_command))
         
@@ -289,14 +287,12 @@ class Server():
 
         elif (json_msg["type"] == "confirmation_trigger_alarm"):
             worker_id = json_msg["worker_id"]
-            # if json_msg['value'] == 1:
-                # print(f"O sistema de alarme {'pode' if json_msg['success'] else 'nao pode'} ser ligado na {worker_id.split(':')[1]}.")
             if json_msg['success']:
                 self.trigger_confirmation_response -= 1
             else:
                 self.trigger_confirmation_error = True
             if self.trigger_confirmation_response == 0 and self.trigger_confirmation_error == False:
-                self._send_trigger_alarm_command(utils.encode_message(type="trigger_alarm", value=json_msg['value']))
+                self.sendlall(utils.encode_message(type="trigger_alarm", value=json_msg['value']))
                 self.states[utils.Sensor.Alarme.value] = json_msg['value']
 
         elif (json_msg["type"] == "states_update"):

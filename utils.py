@@ -39,6 +39,7 @@ class Sensor(Enum):
     Temperature = "Temperature"
     Humidity = "Humidity"
     Alarme = "Alarme"
+    Alarme_Incendio = "Alarme_Incendio"
 
 class SensorName(Enum):
     L_01 = "Lâmpada 01"
@@ -55,6 +56,7 @@ class SensorName(Enum):
     Temperature = "Temperatura"
     Humidity = "Umidade"
     Alarme = "Sistema de Alarme"
+    Alarme_Incendio = "Sistema de alarme de incendio"
 
 def show_state(state):
     people_inside = state[Sensor.SC_IN.value] - state[Sensor.SC_OUT.value]
@@ -80,7 +82,9 @@ def get_initial_state():
         Sensor.SC_IN.value: 0,
         Sensor.SC_OUT.value: 0,
         Sensor.Temperature.value: 0,
-        Sensor.Humidity.value: 0
+        Sensor.Humidity.value: 0,
+        Sensor.Alarme.value: 0,
+        Sensor.Alarme_Incendio.value: 0
     }
 
 def encode_message(**data):
