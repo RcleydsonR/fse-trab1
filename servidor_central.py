@@ -30,6 +30,8 @@ class Server():
         self.states = {
             utils.Sensor.Alarme.value: 0
         }
+        self.trigger_confirmation_response = 0
+        self.trigger_confirmation_error = False
 
     def start(self):
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -46,6 +48,7 @@ class Server():
         return
 
     def show_menu(self):
+        self.step = utils.Steps.MENU.value
         print("", "------------------------------------------------", "Voce esta no menu principal, o que deseja fazer:", *menu_options.ask_main_menu(), "", sep="\n")
 
     def _handle_stdin(self, option):
@@ -118,8 +121,7 @@ class Server():
             self._send_all_workers_command(utils.encode_message(type="turn_off_all"))
         elif option == workers_size + 3:
             value_to_trigger = 0 if self.states[utils.Sensor.Alarme.value] == 1 else 1
-            self._send_all_workers_command(utils.encode_message(type="trigger_alarm", value=value_to_trigger))
-            self.states[utils.Sensor.Alarme.value] = value_to_trigger
+            self._send_all_workers_command(utils.encode_message(type="verify_trigger_alarm", value=value_to_trigger))
 
     def _define_command(self, option):
         ask_command = menu_options.ask_command(self.states[self.selected_worker.id])
@@ -167,21 +169,27 @@ class Server():
 
         while self.waiting_response != 0:
             for loading_step in loading_steps:
+                print(f"\rAguardando confirmacao do comando {loading_step}", end=" ")
+                sleep(0.25)
+                timeout += 1
+                if self.trigger_confirmation_error:
+                    self.waiting_response = 0
+                    break
                 if self.waiting_response != 0:
                     break
                 if timeout == 20:
                     breaked_by_timeout = True
                     self.waiting_response = 0
                     break
-                print(f"\rAguardando confirmacao do comando {loading_step}", end=" ")
-                sleep(0.25)
-                timeout += 1
         
-        if breaked_by_timeout:
+        if self.trigger_confirmation_error == True:
+            print(f"\rComando nao confirmado. Algum sensor de (presenca, abertura de porta ou janela) esta ativado.", u'\u2717', end=" ")
+        elif breaked_by_timeout:
             print(f"\rComando nao confirmado (Timeout exceed) ", u'\u2717', end=" ")
         else:
             print(f"\rComando confirmado com sucesso ", u'\u2713', "   ", end=" ")
         
+        self.trigger_confirmation_error = False
         self.show_menu()
         return
 
@@ -189,8 +197,13 @@ class Server():
         for worker in self.workers:
             worker.conn.sendall(bytes(encoded_command))
         self.waiting_response = len(self.workers)
+        self.trigger_confirmation_response = len(self.workers)
         threading.Thread(target=self._load_animation).start()
 
+    def _send_trigger_alarm_command(self, encoded_command):
+        for worker in self.workers:
+            worker.conn.sendall(bytes(encoded_command))
+        
     def _run(self):
         print("Aguardando em ", (self.ip, self.port))
 
@@ -269,10 +282,23 @@ class Server():
 
         elif (json_msg["type"] == "confirmation"):
             worker_id = json_msg["worker_id"]
-            print(f"O comando foi executado com {'sucesso' if json_msg['success'] else 'falha'} na {worker_id.split(':')[1]}.")
+            print(f"\nO comando foi executado com {'sucesso' if json_msg['success'] else 'falha'} na {worker_id.split(':')[1]}.")
             for index, state in enumerate(list(json_msg["states_id"])):
                 self.states[worker_id][state] = list(json_msg["values"])[index]
             self.waiting_response -= 1
+
+        elif (json_msg["type"] == "confirmation_trigger_alarm"):
+            worker_id = json_msg["worker_id"]
+            # if json_msg['value'] == 1:
+                # print(f"O sistema de alarme {'pode' if json_msg['success'] else 'nao pode'} ser ligado na {worker_id.split(':')[1]}.")
+            if json_msg['success']:
+                self.trigger_confirmation_response -= 1
+            else:
+                self.trigger_confirmation_error = True
+            if self.trigger_confirmation_response == 0 and self.trigger_confirmation_error == False:
+                self._send_trigger_alarm_command(utils.encode_message(type="trigger_alarm", value=json_msg['value']))
+                self.states[utils.Sensor.Alarme.value] = json_msg['value']
+
         elif (json_msg["type"] == "states_update"):
             worker_id = json_msg["worker_id"]
             for index, state in enumerate(list(json_msg["states_id"])):

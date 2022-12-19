@@ -108,6 +108,15 @@ class Worker():
             else:
                 return False
         return True
+    
+    def _verify_can_trigger_alarm_system(self):
+        if GPIO.input(self.presence_sensor) == 1:
+            return False
+        if GPIO.input(self.window_sensor) == 1:
+            return False
+        if GPIO.input(self.door_sensor) == 1:
+            return False
+        return True
 
     def verifyTemperature(self):
         humidity, temperature = Adafruit_DHT.read_retry(22, self.temperature_sensor)
@@ -123,7 +132,6 @@ class Worker():
     
     def _apply_presence_sensor_logic(self):
         if GPIO.input(self.presence_sensor) == 1:
-            breakpoint()
             if self.states[utils.Sensor.Alarme.value] == 1:
                 self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 1)
             else:
@@ -276,6 +284,12 @@ class Worker():
                 self.turn_on_off_outputs([utils.Sensor.AL_BZ.value], 0)
             self.states[utils.Sensor.Alarme.value] = json_msg["value"]
             self.server.send(utils.encode_message(type="confirmation", success=True, worker_id=self.id_on_server, states_id=[utils.Sensor.Alarme.value], values = [json_msg["value"]]))
+        elif (json_msg["type"] ==  "verify_trigger_alarm"):
+            can_trigger_alarm = True
+            value_to_trigger = json_msg["value"]
+            if  value_to_trigger == 1:
+                can_trigger_alarm = self._verify_can_trigger_alarm_system()
+            self.server.send(utils.encode_message(type="confirmation_trigger_alarm", success=can_trigger_alarm, worker_id=self.id_on_server, value=value_to_trigger))
         elif (json_msg["type"] ==  "states_backup"):
             self.states = json_msg["states"]
         else:
