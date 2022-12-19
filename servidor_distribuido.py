@@ -32,7 +32,7 @@ class Worker():
         self.id_on_server = f"{self.config_data['ip_servidor_distribuido']}:{self.config_data['nome']}"
         try:
             self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
-            self.server.send(utils.encode_message(type="worker_identify", id=self.id_on_server))
+            self.server.send(utils.encode_message(type="worker_identify", states=self.states, id=self.id_on_server))
         except:
             print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
             sys.exit()

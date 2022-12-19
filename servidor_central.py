@@ -292,13 +292,17 @@ class Server():
             else:
                 self.trigger_confirmation_error = True
             if self.trigger_confirmation_response == 0 and self.trigger_confirmation_error == False:
-                self.sendlall(utils.encode_message(type="trigger_alarm", value=json_msg['value']))
+                self._send_all_workers_command(utils.encode_message(type="trigger_alarm", value=json_msg['value']))
                 self.states[utils.Sensor.Alarme.value] = json_msg['value']
 
         elif (json_msg["type"] == "states_update"):
             worker_id = json_msg["worker_id"]
             for index, state in enumerate(list(json_msg["states_id"])):
                 self.states[worker_id][state] = list(json_msg["values"])[index]
+                if state in [utils.Sensor.SPres.value, utils.Sensor.SPor.value, utils.Sensor.SJan.value] and self.states[utils.Sensor.Alarme.value] == 1:
+                    self.workers[worker_id].sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=1))
+                if state == utils.Sensor.Alarme_Incendio.value and self.states[utils.Sensor.Alarme_Incendio.value] == 1:
+                    self.workers[worker_id].sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=1))
         else:
             print(json_msg)
 
