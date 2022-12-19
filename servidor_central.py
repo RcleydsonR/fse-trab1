@@ -7,6 +7,7 @@ import utils
 from typing import TextIO
 from time import sleep
 import threading
+from datetime import datetime
 
 class Server():
     server: socket.socket
@@ -33,6 +34,7 @@ class Server():
         }
         self.trigger_confirmation_response = 0
         self.trigger_confirmation_error = False
+        self.csv_data = []
 
     def start(self):
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -87,7 +89,10 @@ class Server():
             self.step = utils.Steps.TRIGGER.value
             pass
         else:
-            pass
+            csv_header = ['Comando', 'Ambiente', 'Data do comando', 'Estado do Comando']
+            file_name = utils.generate_csv_file(csv_header, self.csv_data)  
+            print(f"Arquivo csv disponibilizado com sucesso em: {file_name}")
+            self.show_menu() 
     
     def _show_states(self):
         people_total = 0
@@ -118,15 +123,20 @@ class Server():
             self.step = utils.Steps.COMMAND.value
             return
         elif option == workers_size + 1:
+            self.csv_data.append(["Ligar todas as lampadas", "Todos", str(datetime.now())])
             self._send_all_workers_command(utils.encode_message(type="turn_on_all_lights"))
         elif option == workers_size + 2:
+            self.csv_data.append(["Desligar todas as cargas", "Todos", str(datetime.now())])
             self._send_all_workers_command(utils.encode_message(type="turn_off_all"))
         elif option == workers_size + 3:
             value_to_trigger = 0 if self.states[utils.Sensor.Alarme.value] == 1 else 1
+            self.csv_data.append([f"{'Ligar' if value_to_trigger == 1 else 'Desligar'} o sistema de alarme", "Todos", str(datetime.now())])
             self.trigger_confirmation_response = len(self.workers)
             self._send_all_workers_command(utils.encode_message(type="verify_trigger_alarm", value=value_to_trigger))
         elif option == workers_size + 4:
+            self.csv_data.append(["Ligar todas as lampadas", "Todos", str(datetime.now())])
             value_to_trigger = 0 if self.states[utils.Sensor.Alarme_Incendio.value] == 1 else 1
+            self.csv_data.append([f"{'Ligar' if value_to_trigger == 1 else 'Desligar'} o alarme de incendio", "Todos", str(datetime.now())])
             self.states[utils.Sensor.Alarme_Incendio.value] = value_to_trigger
             self._send_all_workers_command(utils.encode_message(type="trigger_fire_alarm", value=value_to_trigger))
         self.waiting_response = len(self.workers)
@@ -145,21 +155,28 @@ class Server():
             return
         elif option == 1:
             value_to_trigger = 0 if self.states[worker.id][utils.Sensor.L_01.value] == 1 else 1
+            self.csv_data.append([f"{'Ligar' if value_to_trigger == 1 else 'Desligar'} a Lampada 1", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.L_01.value, value=value_to_trigger))
         elif option == 2:
             value_to_trigger = 0 if self.states[worker.id][utils.Sensor.L_02.value] == 1 else 1
+            self.csv_data.append([f"{'Ligar' if value_to_trigger == 1 else 'Desligar'} a Lampada 2", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.L_02.value, value=value_to_trigger))
         elif option == 3:
             value_to_trigger = 0 if self.states[worker.id][utils.Sensor.AC.value] == 1 else 1
+            self.csv_data.append([f"{'Ligar' if value_to_trigger == 1 else 'Desligar'} o Ar Condicionado", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AC.value, value=value_to_trigger))
         elif option == 4:
             value_to_trigger = 0 if self.states[worker.id][utils.Sensor.PR.value] == 1 else 1
+            self.csv_data.append([f"{'Ligar' if value_to_trigger == 1 else 'Desligar'} o Projetor", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.PR.value, value=value_to_trigger))
         elif option == 5:
+            self.csv_data.append(["Ligar todas as lampadas", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="turn_on_all_lights"))
         elif option == 6:
+            self.csv_data.append(["Desligar todas as lampadas", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="turn_off_all_lights"))
         elif option == 7:
+            self.csv_data.append(["Desligar todas as cargas", worker.name, str(datetime.now())])
             worker.conn.sendall(utils.encode_message(type="turn_off_all"))
         
         self.waiting_response = 1
@@ -188,10 +205,13 @@ class Server():
                     break
         
         if self.trigger_confirmation_error == True:
+            self.csv_data[len(self.csv_data) - 1].append("Falha")
             print(f"\rComando nao confirmado. Algum sensor de (presenca, abertura de porta ou janela) esta ativado.", u'\u2717', end=" ")
         elif breaked_by_timeout:
+            self.csv_data[len(self.csv_data) - 1].append("Falha por tempo de espera")
             print(f"\rComando nao confirmado (Timeout exceed) ", u'\u2717', end=" ")
         else:
+            self.csv_data[len(self.csv_data) - 1].append("Sucesso")
             print(f"\rComando confirmado com sucesso ", u'\u2713', "   ", end=" ")
         
         self.trigger_confirmation_error = False
@@ -280,7 +300,7 @@ class Server():
 
         elif (json_msg["type"] == "confirmation"):
             worker_id = json_msg["worker_id"]
-            print(f"\nO comando foi executado com {'sucesso' if json_msg['success'] else 'falha'} na {worker_id.split(':')[1]}.")
+            #print(f"\nO comando foi executado com {'sucesso' if json_msg['success'] else 'falha'} na {worker_id.split(':')[1]}.")
             for index, state in enumerate(list(json_msg["states_id"])):
                 self.states[worker_id][state] = list(json_msg["values"])[index]
             self.waiting_response -= 1
@@ -299,10 +319,12 @@ class Server():
             worker_id = json_msg["worker_id"]
             for index, state in enumerate(list(json_msg["states_id"])):
                 self.states[worker_id][state] = list(json_msg["values"])[index]
-                if state in [utils.Sensor.SPres.value, utils.Sensor.SPor.value, utils.Sensor.SJan.value] and self.states[utils.Sensor.Alarme.value] == 1:
-                    self.workers[worker_id].sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=1))
-                if state == utils.Sensor.Alarme_Incendio.value and self.states[utils.Sensor.Alarme_Incendio.value] == 1:
-                    self.workers[worker_id].sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=1))
+                # if state in [utils.Sensor.SPres.value, utils.Sensor.SPor.value, utils.Sensor.SJan.value] and self.states[utils.Sensor.Alarme.value] == 1:
+                #     worker = utils.find_worker_by_id(self.workers, worker_id)
+                #     worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=1))
+                # if state == utils.Sensor.Alarme_Incendio.value and self.states[utils.Sensor.Alarme_Incendio.value] == 1:
+                #     worker = utils.find_worker_by_id(self.workers, worker_id)
+                #     worker.conn.sendall(utils.encode_message(type="trigger_output", state_id=utils.Sensor.AL_BZ.value, value=1))
         else:
             print(json_msg)
 

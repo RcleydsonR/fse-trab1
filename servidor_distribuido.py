@@ -32,9 +32,8 @@ class Worker():
         self.id_on_server = f"{self.config_data['ip_servidor_distribuido']}:{self.config_data['nome']}"
         try:
             self.server.connect((self.config_data["ip_servidor_central"], self.config_data["porta_servidor_central"]))
-            self.server.send(utils.encode_message(type="worker_identify", states=self.states, id=self.id_on_server))
         except:
-            print("Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao")
+            print(f"Servidor inatingivel, verifique o ip e porta passado no arquivo de configuracao \nIP: {self.config_data['ip_servidor_central']}\nPORT: {self.config_data['porta_servidor_central']}")
             sys.exit()
 
         self.inputs = [self.server]
@@ -88,6 +87,9 @@ class Worker():
             utils.Sensor.Alarme.value: 0,
             utils.Sensor.Alarme_Incendio.value: 0
         }
+        
+        self.server.send(utils.encode_message(type="worker_identify", states=self.states, id=self.id_on_server))
+
 
     def _setup_sensors(self):
         GPIO.setup(self.light_1, GPIO.OUT)

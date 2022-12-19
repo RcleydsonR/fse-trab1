@@ -1,7 +1,7 @@
 {
-    "ip_servidor_central": "127.0.0.1",
+    "ip_servidor_central": "164.41.98.16",
     "porta_servidor_central": 10691,
-    "ip_servidor_distribuido": "192.168.0.52",
+    "ip_servidor_distribuido": "164.41.98.16",
     "nome": "Sala 01",
     "outputs": [
         {

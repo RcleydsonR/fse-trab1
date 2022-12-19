@@ -1,4 +1,6 @@
 import json
+import csv
+from datetime import datetime
 from enum import Enum
 
 def get_obj_by_element(object_list: list, element_key: str, element_to_find):
@@ -108,3 +110,12 @@ def decode_recv_message(data):
         data_list.append(data[0:end_index])
         data = data[end_index:len(data)]
     return data_list
+
+def generate_csv_file(csv_header, csv_data):
+    current_date = datetime.now()
+    file_name = f"log-{current_date.day}-{current_date.month}-{current_date.year}-{current_date.hour}-{current_date.minute}-{current_date.second}.csv"
+    with open(file_name, 'w', encoding="UTF8") as file:
+        writer = csv.writer(file)
+        writer.writerow(csv_header)
+        writer.writerows(csv_data)
+    return file_name
