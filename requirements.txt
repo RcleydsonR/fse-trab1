@@ -1,0 +1,2 @@
+click
+Adafruit_DHT
